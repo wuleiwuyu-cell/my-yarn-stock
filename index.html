@@ -47,13 +47,12 @@
         .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
         .pt-safe { padding-top: max(1rem, env(safe-area-inset-top)); }
         
-        /* 底部导航栏专用样式：确保背景色延伸到安全区域 */
+        /* 底部导航栏专用样式 */
         .nav-fixed {
             position: fixed; bottom: 0; left: 0; right: 0; 
-            margin: 0 auto; max-width: 480px; /* 保持与容器同宽 */
-            background-color: white;
-            z-index: 50;
-            padding-bottom: env(safe-area-inset-bottom); /* 关键：背景色填充安全区 */
+            margin: 0 auto; max-width: 480px; 
+            background-color: white; z-index: 50;
+            padding-bottom: env(safe-area-inset-bottom);
         }
         
         .modal-mask {
@@ -100,7 +99,7 @@
             </div>
         </header>
 
-        <!-- 主内容 (pb-28 预留底部导航空间) -->
+        <!-- 主内容 -->
         <main class="flex-1 overflow-y-auto hide-scrollbar p-4 pb-28">
             
             <!-- 1. 主页 -->
@@ -335,18 +334,16 @@
                         点击导出 -> 点击"下载" -> 点击地址栏蓝色箭头 -> 点击下载项 -> 点击左下角"分享" -> 选择"存储到'文件'"。
                     </p>
                 </div>
-                <div class="text-center text-gray-400 text-xs pt-4">我的毛线仓库 v2.3 (完美屏适配版)</div>
+                <div class="text-center text-gray-400 text-xs pt-4">我的毛线仓库 v2.4 (Excel修复版)</div>
             </div>
         </main>
 
-        <!-- 悬浮按钮：针对新的导航栏高度调整 -->
         <button v-if="currentPage === 'home'" @click="openAddForm" 
             class="fixed right-6 w-14 h-14 bg-theme text-white rounded-full shadow-lg shadow-gray-400/50 flex items-center justify-center text-2xl z-30 transition-transform active:scale-95"
             style="bottom: calc(4.5rem + env(safe-area-inset-bottom));">
             <i class="fas fa-plus"></i>
         </button>
 
-        <!-- 底部导航：完全重构为 Fixed 布局 -->
         <nav class="nav-fixed border-t border-gray-200">
             <div class="flex w-full h-12 items-center">
                 <button @click="currentPage = 'home'" class="flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors h-full" :class="currentPage!=='settings' ? 'text-theme' : 'text-gray-400'">
@@ -536,24 +533,39 @@
             const toggleFavorite = (y) => y.isFavorite = !y.isFavorite;
             const confirmDelete = (y) => { if (confirm('确定删除吗？')) { yarns.value = yarns.value.filter(item => item.id !== y.id); currentPage.value = 'home'; }};
 
+            // --- 核心修复：分段导出，解决 Excel 32k 字符限制 ---
             const exportExcel = () => {
                 const nameInput = prompt("请输入备份文件名称:", "毛线库存_" + new Date().toISOString().split('T')[0]);
                 if (!nameInput) return;
                 isLoading.value = true;
-                loadingText.value = '正在打包包含照片的数据...';
+                loadingText.value = '正在分段打包数据...';
+                
                 setTimeout(() => {
                     try {
-                        const data = yarns.value.map(y => ({
-                            '编号(勿改)': y.id, '名称': y.name, '品牌': y.brand, '成分': y.composition,
-                            '颜色': y.color, '总重量(g)': y.weight, '总价格': y.price, '支数': y.ply,
-                            '来源': y.source, '购买时间': y.buyDate, '已消耗(g)': y.consumed,
-                            '图片数据(勿改)': (y.images || []).join('|||')
-                        }));
+                        const data = yarns.value.map(y => {
+                            const base = {
+                                '编号(勿改)': y.id, '名称': y.name, '品牌': y.brand, '成分': y.composition,
+                                '颜色': y.color, '总重量(g)': y.weight, '总价格': y.price, '支数': y.ply,
+                                '来源': y.source, '购买时间': y.buyDate, '已消耗(g)': y.consumed
+                            };
+                            // 分段处理图片
+                            const fullImgStr = (y.images || []).join('|||');
+                            if(fullImgStr) {
+                                const chunkSize = 30000; // 留安全余量 < 32767
+                                const totalChunks = Math.ceil(fullImgStr.length / chunkSize);
+                                for(let i=0; i<totalChunks; i++) {
+                                    base[`图片数据_${i}`] = fullImgStr.substr(i * chunkSize, chunkSize);
+                                }
+                            }
+                            return base;
+                        });
+
                         const wb = XLSX.utils.book_new();
                         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), "库存");
                         const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
                         const blob = new Blob([wbout], { type: 'application/octet-stream' });
                         const url = window.URL.createObjectURL(blob);
+                        
                         const a = document.createElement("a");
                         a.href = url;
                         a.download = nameInput + ".xlsx";
@@ -561,16 +573,19 @@
                         a.click();
                         document.body.removeChild(a);
                         window.URL.revokeObjectURL(url);
-                        setTimeout(() => { alert("导出成功！\n\n请在 Safari 地址栏查看下载进度，随后转存到【文件】App。"); }, 1000);
+                        
+                        setTimeout(() => { alert("导出成功！\n请点击 Safari 地址栏的下载图标，随后转存到【文件】App。"); }, 1000);
                     } catch (e) { alert("导出失败：" + e.message); } finally { isLoading.value = false; }
                 }, 100);
             };
 
+            // --- 核心修复：分段导入逻辑 ---
             const importExcel = (e) => {
                 const file = e.target.files[0];
                 if(!file) return;
                 isLoading.value = true;
-                loadingText.value = '正在恢复数据和照片...';
+                loadingText.value = '正在拼合数据...';
+                
                 setTimeout(() => {
                     const reader = new FileReader();
                     reader.onload = (evt) => {
@@ -578,10 +593,26 @@
                             const wb = XLSX.read(new Uint8Array(evt.target.result), {type: 'array'});
                             const jsonData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
                             let added = 0, updated = 0;
+                            
                             jsonData.forEach(row => {
                                 const id = row['编号(勿改)'];
-                                const imgStr = row['图片数据(勿改)'] || '';
-                                const imgs = imgStr ? imgStr.split('|||') : [];
+                                
+                                // 还原分段图片数据
+                                let fullImgStr = "";
+                                const imgKeys = Object.keys(row).filter(k => k.startsWith('图片数据_'));
+                                // 按后缀数字排序：图片数据_0, 图片数据_1, ...
+                                imgKeys.sort((a,b) => {
+                                    const numA = parseInt(a.split('_')[1]);
+                                    const numB = parseInt(b.split('_')[1]);
+                                    return numA - numB;
+                                });
+                                imgKeys.forEach(k => fullImgStr += row[k]);
+                                
+                                // 兼容旧版逻辑（万一用户导入的是旧Excel）
+                                if(!fullImgStr && row['图片数据(勿改)']) fullImgStr = row['图片数据(勿改)'];
+
+                                const imgs = fullImgStr ? fullImgStr.split('|||') : [];
+                                
                                 const item = {
                                     id: id || Date.now().toString(36) + Math.random().toString(36).substr(2),
                                     name: row['名称'], brand: row['品牌']||'', composition: row['成分']||'',
@@ -597,7 +628,7 @@
                                 else { yarns.value.unshift(item); added++; }
                             });
                             alert(`恢复成功：新增 ${added} 条, 更新 ${updated} 条`);
-                        } catch (err) { alert("读取失败"); } finally { isLoading.value = false; e.target.value = ''; }
+                        } catch (err) { alert("读取失败，文件可能已损坏。"); } finally { isLoading.value = false; e.target.value = ''; }
                     };
                     reader.readAsArrayBuffer(file);
                 }, 100);
