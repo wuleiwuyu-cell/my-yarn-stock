@@ -29,7 +29,7 @@
         }
         
         .mobile-container {
-            max-width: 480px; margin: 0 auto; height: 100vh; height: 100dvh; 
+            max-width: 480px; margin: 0 auto; min-height: 100vh;
             background-color: #f9fafb; box-shadow: 0 0 20px rgba(0,0,0,0.1);
             position: relative; display: flex; flex-direction: column;
         }
@@ -47,30 +47,28 @@
         .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
         .pt-safe { padding-top: max(1rem, env(safe-area-inset-top)); }
         
+        /* 底部导航栏专用样式：确保背景色延伸到安全区域 */
+        .nav-fixed {
+            position: fixed; bottom: 0; left: 0; right: 0; 
+            margin: 0 auto; max-width: 480px; /* 保持与容器同宽 */
+            background-color: white;
+            z-index: 50;
+            padding-bottom: env(safe-area-inset-bottom); /* 关键：背景色填充安全区 */
+        }
+        
         .modal-mask {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5); z-index: 50;
+            background: rgba(0,0,0,0.5); z-index: 60;
             display: flex; align-items: center; justify-content: center;
         }
 
-        /* 图片列表网格 */
-        .image-grid {
-            display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
-        }
-        .image-item {
-            aspect-ratio: 1; border-radius: 8px; overflow: hidden; position: relative;
-            background-color: #f3f4f6; border: 1px solid #e5e7eb;
-        }
+        .image-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .image-item { aspect-ratio: 1; border-radius: 8px; overflow: hidden; position: relative; background-color: #f3f4f6; border: 1px solid #e5e7eb; }
         .image-item img { width: 100%; height: 100%; object-fit: cover; }
-        .delete-btn {
-            position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.5);
-            color: white; border-radius: 50%; width: 20px; height: 20px;
-            display: flex; align-items: center; justify-content: center; font-size: 12px;
-        }
-        .main-tag {
-            position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.6);
-            color: white; font-size: 10px; text-align: center; padding: 2px 0;
-        }
+        .delete-btn { position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.5); color: white; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+        .main-tag { position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.6); color: white; font-size: 10px; text-align: center; padding: 2px 0; }
+        .spinner { border: 4px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top: 4px solid #ffffff; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -78,8 +76,14 @@
 <div id="app" class="h-full text-gray-700">
     <div class="mobile-container">
         
+        <!-- 全局加载遮罩 -->
+        <div v-if="isLoading" class="fixed inset-0 z-[100] bg-black/50 flex flex-col items-center justify-center text-white backdrop-blur-sm">
+            <div class="spinner mb-4"></div>
+            <p>{{ loadingText }}</p>
+        </div>
+
         <!-- 头部 -->
-        <header class="bg-theme text-white pt-safe px-4 pb-3 shadow-lg z-20 flex-shrink-0 transition-colors duration-300">
+        <header class="bg-theme text-white pt-safe px-4 pb-3 shadow-lg z-20 flex-shrink-0 transition-colors duration-300 sticky top-0">
             <div class="flex justify-between items-center relative h-10">
                 <button v-if="currentPage !== 'home' && currentPage !== 'settings'" @click="goBack" class="w-8 h-8 flex items-center justify-center active:opacity-70">
                     <i class="fas fa-arrow-left"></i>
@@ -96,12 +100,11 @@
             </div>
         </header>
 
-        <!-- 主内容 -->
-        <main class="flex-1 overflow-y-auto hide-scrollbar p-4 pb-24">
+        <!-- 主内容 (pb-28 预留底部导航空间) -->
+        <main class="flex-1 overflow-y-auto hide-scrollbar p-4 pb-28">
             
             <!-- 1. 主页 -->
             <div v-if="currentPage === 'home'" class="space-y-4">
-                <!-- 统计 -->
                 <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 grid grid-cols-2 gap-4">
                     <div>
                         <div class="text-xs text-gray-400 mb-1">库存总重</div>
@@ -117,7 +120,6 @@
                     </div>
                 </div>
 
-                <!-- 筛选 -->
                 <div class="flex items-center gap-3 overflow-x-auto pb-2 hide-scrollbar">
                     <button @click="filterType = 'all'" :class="filterType === 'all' ? 'bg-theme text-white shadow-md' : 'bg-white text-gray-600 border'" class="flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium">全部</button>
                     <button @click="filterType = 'fav'" :class="filterType === 'fav' ? 'bg-theme text-white shadow-md' : 'bg-white text-gray-600 border'" class="flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium">收藏 ❤️</button>
@@ -129,7 +131,6 @@
                     </select>
                 </div>
 
-                <!-- 列表 -->
                 <div class="space-y-3">
                     <div v-if="filteredYarns.length === 0" class="text-center py-20 opacity-50">
                         <i class="fas fa-box-open text-5xl mb-3 text-gray-300"></i>
@@ -139,7 +140,6 @@
                     <div v-for="yarn in filteredYarns" :key="yarn.id" @click="viewDetail(yarn)" 
                         class="bg-white rounded-xl p-3 shadow-sm active:scale-[0.98] transition-transform duration-100 flex gap-3 border border-gray-100">
                         <div class="w-24 h-24 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden relative">
-                            <!-- 显示第一张图作为封面 -->
                             <img v-if="yarn.images && yarn.images.length > 0" :src="yarn.images[0]" class="w-full h-full object-cover">
                             <div v-else class="w-full h-full flex items-center justify-center text-gray-300">
                                 <i class="fas fa-image text-xl"></i>
@@ -172,31 +172,23 @@
                 </div>
             </div>
 
-            <!-- 2. 编辑/添加 (支持多图) -->
+            <!-- 2. 编辑/添加 -->
             <div v-if="currentPage === 'form'" class="space-y-5">
-                <!-- 图片上传区 -->
                 <div class="bg-white p-4 rounded-xl shadow-sm">
                     <div class="flex justify-between items-center mb-2">
                         <span class="text-xs font-bold text-gray-500">照片 ({{formData.images.length}}张)</span>
                         <span class="text-xs text-gray-400">第一张为主图</span>
                     </div>
-                    
                     <div class="image-grid">
-                        <!-- 已有图片 -->
                         <div v-for="(img, idx) in formData.images" :key="idx" class="image-item">
                             <img :src="img">
                             <div class="delete-btn" @click.stop="removeImage(idx)"><i class="fas fa-times"></i></div>
                             <div v-if="idx === 0" class="main-tag">封面</div>
                         </div>
-                        
-                        <!-- 添加按钮 -->
                         <div class="image-item flex flex-col items-center justify-center bg-gray-50 text-gray-400 active:bg-gray-100" @click="$refs.fileInput.click()">
-                            <i class="fas fa-camera text-xl mb-1"></i>
-                            <span class="text-xs">添加</span>
+                            <i class="fas fa-camera text-xl mb-1"></i><span class="text-xs">添加</span>
                         </div>
                     </div>
-                    
-                    <!-- 隐藏的 input, 支持多选 -->
                     <input type="file" ref="fileInput" accept="image/*" multiple class="hidden" @change="handleImageUpload">
                 </div>
 
@@ -205,7 +197,6 @@
                         <label class="text-xs font-bold text-gray-500">名称 <span class="text-red-500">*</span></label>
                         <input v-model="formData.name" type="text" class="w-full mt-1 p-2 bg-gray-50 border-b-2 border-transparent focus:border-theme outline-none" placeholder="输入名称">
                     </div>
-
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="text-xs font-bold text-gray-500">品牌</label>
@@ -218,7 +209,6 @@
                             <datalist id="list_colors"><option v-for="opt in options.colors" :value="opt"></datalist>
                         </div>
                     </div>
-
                     <div>
                         <label class="text-xs font-bold text-gray-500">成分 <span class="text-red-500">*</span></label>
                         <div class="flex gap-2 mt-1">
@@ -229,7 +219,6 @@
                             <input v-model="formData.composition" type="text" class="flex-1 p-2 bg-gray-50 rounded" placeholder="如: 80%羊毛">
                         </div>
                     </div>
-
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="text-xs font-bold text-gray-500">总重量(g) <span class="text-red-500">*</span></label>
@@ -240,7 +229,6 @@
                             <input v-model.number="formData.price" type="number" class="w-full mt-1 p-2 bg-gray-50 rounded font-mono">
                         </div>
                     </div>
-
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="text-xs font-bold text-gray-500">支数</label>
@@ -253,7 +241,6 @@
                             <datalist id="list_sources"><option v-for="opt in options.sources" :value="opt"></datalist>
                         </div>
                     </div>
-                    
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="text-xs font-bold text-gray-500">购买时间</label>
@@ -264,18 +251,12 @@
                             <input v-model.number="formData.consumed" type="number" class="w-full mt-1 p-2 bg-gray-50 rounded font-mono">
                         </div>
                     </div>
-
-                    <div class="bg-theme-light p-3 rounded-lg flex items-center gap-2 text-theme text-sm">
-                        <i class="fas fa-calculator"></i>
-                        <span>折合单价：<b>¥{{ computedUnitPrice }}</b> / 斤</span>
-                    </div>
                 </div>
             </div>
 
-            <!-- 3. 详情页 (多图轮播) -->
+            <!-- 3. 详情页 -->
             <div v-if="currentPage === 'detail' && selectedYarn" class="space-y-4">
                 <div class="relative bg-black rounded-2xl overflow-hidden shadow-sm" style="min-height: 280px;">
-                    <!-- 图片容器 -->
                     <div class="flex overflow-x-auto hide-scrollbar snap-x snap-mandatory" style="height: 300px;">
                          <div v-if="!selectedYarn.images || selectedYarn.images.length === 0" class="w-full flex-shrink-0 flex items-center justify-center bg-gray-200 h-full text-gray-400">
                              无图片
@@ -287,7 +268,6 @@
                              </div>
                          </div>
                     </div>
-                    
                     <button @click="toggleFavorite(selectedYarn)" class="absolute bottom-[-20px] right-6 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center text-xl z-10" style="bottom: 10px;">
                         <i :class="['fas fa-heart', selectedYarn.isFavorite ? 'text-red-500' : 'text-gray-300']"></i>
                     </button>
@@ -310,7 +290,6 @@
                             <div class="text-xl font-bold text-gray-700">¥{{ (selectedYarn.price / (selectedYarn.weight/500)).toFixed(0) }}</div>
                         </div>
                     </div>
-                    
                     <div class="space-y-3 text-sm">
                         <div class="flex border-b border-gray-100 pb-2"><span class="text-gray-400 w-20">品牌</span><span class="text-gray-800">{{ selectedYarn.brand || '-' }}</span></div>
                         <div class="flex border-b border-gray-100 pb-2"><span class="text-gray-400 w-20">颜色</span><span class="text-gray-800">{{ selectedYarn.color || '-' }}</span></div>
@@ -319,11 +298,10 @@
                         <div class="flex border-b border-gray-100 pb-2"><span class="text-gray-400 w-20">购买日期</span><span class="text-gray-800">{{ selectedYarn.buyDate || '-' }}</span></div>
                     </div>
                 </div>
-
                 <button @click="confirmDelete(selectedYarn)" class="w-full py-3 text-red-500 bg-white border border-red-100 rounded-xl font-bold active:bg-red-50">删除记录</button>
             </div>
 
-            <!-- 4. 设置页面 -->
+            <!-- 4. 设置 -->
             <div v-if="currentPage === 'settings'" class="space-y-5">
                 <div class="bg-white p-5 rounded-xl shadow-sm">
                     <h3 class="font-bold text-gray-700 mb-4 flex items-center"><i class="fas fa-palette mr-2 text-theme"></i> 主题颜色</h3>
@@ -331,7 +309,6 @@
                         <button v-for="c in ['pink','blue','purple','orange','gray']" :key="c" @click="theme = c" class="w-10 h-10 rounded-full ring-2 ring-offset-2 transition-all" :style="{backgroundColor: themeMap[c].primary}" :class="theme===c?'ring-gray-400 scale-110':'ring-transparent'"></button>
                     </div>
                 </div>
-
                 <div class="bg-white p-5 rounded-xl shadow-sm">
                     <h3 class="font-bold text-gray-700 mb-4 flex items-center"><i class="fas fa-list-ul mr-2 text-theme"></i> 选项管理</h3>
                     <div class="space-y-3">
@@ -340,27 +317,45 @@
                         </button>
                     </div>
                 </div>
-
                 <div class="bg-white p-5 rounded-xl shadow-sm">
-                    <h3 class="font-bold text-gray-700 mb-4 flex items-center"><i class="fas fa-database mr-2 text-theme"></i> 数据备份</h3>
+                    <h3 class="font-bold text-gray-700 mb-4 flex items-center"><i class="fas fa-database mr-2 text-theme"></i> 数据备份(含照片)</h3>
                     <div class="flex gap-3">
-                        <button @click="exportExcel" class="flex-1 bg-green-500 text-white py-3 rounded-xl flex items-center justify-center gap-2 shadow-sm"><i class="fas fa-file-export"></i> 导出</button>
+                        <button @click="exportExcel" class="flex-1 bg-green-500 text-white py-3 rounded-xl flex items-center justify-center gap-2 shadow-sm active:bg-green-600 transition-colors">
+                            <i class="fas fa-file-export"></i> 导出备份
+                        </button>
                         <div class="flex-1 relative">
-                             <button class="w-full bg-blue-500 text-white py-3 rounded-xl flex items-center justify-center gap-2 shadow-sm"><i class="fas fa-file-import"></i> 导入</button>
+                             <button class="w-full bg-blue-500 text-white py-3 rounded-xl flex items-center justify-center gap-2 shadow-sm active:bg-blue-600 transition-colors">
+                                <i class="fas fa-file-import"></i> 恢复备份
+                             </button>
                              <input type="file" @change="importExcel" accept=".xlsx, .xls" class="absolute top-0 left-0 w-full h-full opacity-0">
                         </div>
                     </div>
-                    <p class="text-xs text-gray-400 mt-2 text-center">建议每月导出一次，防止清理缓存导致数据丢失</p>
+                    <p class="text-xs text-gray-400 mt-2 text-center leading-5">
+                        <i class="fas fa-info-circle"></i> iPhone导出指南：<br>
+                        点击导出 -> 点击"下载" -> 点击地址栏蓝色箭头 -> 点击下载项 -> 点击左下角"分享" -> 选择"存储到'文件'"。
+                    </p>
                 </div>
-                <div class="text-center text-gray-400 text-xs pt-4">我的毛线仓库 v2.0 (多图版)</div>
+                <div class="text-center text-gray-400 text-xs pt-4">我的毛线仓库 v2.3 (完美屏适配版)</div>
             </div>
         </main>
 
-        <button v-if="currentPage === 'home'" @click="openAddForm" class="fixed bottom-24 right-6 w-14 h-14 bg-theme text-white rounded-full shadow-lg shadow-gray-400/50 flex items-center justify-center text-2xl z-30 transition-transform active:scale-95"><i class="fas fa-plus"></i></button>
+        <!-- 悬浮按钮：针对新的导航栏高度调整 -->
+        <button v-if="currentPage === 'home'" @click="openAddForm" 
+            class="fixed right-6 w-14 h-14 bg-theme text-white rounded-full shadow-lg shadow-gray-400/50 flex items-center justify-center text-2xl z-30 transition-transform active:scale-95"
+            style="bottom: calc(4.5rem + env(safe-area-inset-bottom));">
+            <i class="fas fa-plus"></i>
+        </button>
 
-        <nav class="absolute bottom-0 w-full bg-white border-t border-gray-200 h-16 flex z-40 pb-safe">
-            <button @click="currentPage = 'home'" class="flex-1 flex flex-col items-center justify-center gap-1 transition-colors" :class="currentPage!=='settings' ? 'text-theme' : 'text-gray-400'"><i class="fas fa-home text-xl"></i><span class="text-xs font-medium">仓库</span></button>
-            <button @click="currentPage = 'settings'" class="flex-1 flex flex-col items-center justify-center gap-1 transition-colors" :class="currentPage==='settings' ? 'text-theme' : 'text-gray-400'"><i class="fas fa-cog text-xl"></i><span class="text-xs font-medium">设置</span></button>
+        <!-- 底部导航：完全重构为 Fixed 布局 -->
+        <nav class="nav-fixed border-t border-gray-200">
+            <div class="flex w-full h-12 items-center">
+                <button @click="currentPage = 'home'" class="flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors h-full" :class="currentPage!=='settings' ? 'text-theme' : 'text-gray-400'">
+                    <i class="fas fa-home text-xl"></i><span class="text-[10px] font-medium">仓库</span>
+                </button>
+                <button @click="currentPage = 'settings'" class="flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors h-full" :class="currentPage==='settings' ? 'text-theme' : 'text-gray-400'">
+                    <i class="fas fa-cog text-xl"></i><span class="text-[10px] font-medium">设置</span>
+                </button>
+            </div>
         </nav>
 
         <div v-if="showOptionModal" class="modal-mask" @click.self="showOptionModal = false">
@@ -378,6 +373,10 @@
 
     createApp({
         setup() {
+            // --- Loading State ---
+            const isLoading = ref(false);
+            const loadingText = ref('处理中...');
+
             const theme = ref(localStorage.getItem('coil_theme') || 'pink');
             const themeMap = {
                 pink: { primary: '#fb7185', bgLight: '#fff1f2', text: '#881337' },
@@ -411,7 +410,6 @@
             const selectedYarn = ref(null);
             const isEditing = ref(false);
 
-            // 表单数据，注意 images 是数组
             const formData = reactive({
                 id: null, name: '', images: [], brand: '', color: '', composition: '',
                 weight: 500, price: 0, ply: '', source: '', buyDate: '', consumed: 0,
@@ -445,7 +443,6 @@
                 const savedYarns = localStorage.getItem('coil_yarns');
                 if (savedYarns) {
                     let parsed = JSON.parse(savedYarns);
-                    // === 数据迁移逻辑：将旧版 image 字段转换为 images 数组 ===
                     parsed.forEach(y => {
                         if (!y.images) {
                             y.images = y.image ? [y.image] : [];
@@ -464,40 +461,39 @@
             const addOption = () => { if(newOptionInput.value.trim()){ options[editingOptionKey.value].push(newOptionInput.value.trim()); newOptionInput.value = ''; }};
             const removeOption = (i) => options[editingOptionKey.value].splice(i, 1);
 
-            // 多图上传处理
             const handleImageUpload = (e) => {
                 const files = e.target.files;
                 if (!files.length) return;
-                
-                // 限制最多一次加5张，防止卡死
-                const maxProcess = 5;
-                const count = Math.min(files.length, maxProcess);
-
-                for (let i = 0; i < count; i++) {
-                    const reader = new FileReader();
-                    reader.onload = (evt) => {
-                        const img = new Image();
-                        img.onload = () => {
-                            const canvas = document.createElement('canvas');
-                            const ctx = canvas.getContext('2d');
-                            // 稍微压缩更狠一点，适配多图存储
-                            const maxWidth = 500; 
-                            const scale = maxWidth / img.width;
-                            canvas.width = maxWidth;
-                            canvas.height = img.height * scale;
-                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                            // 添加到数组
-                            formData.images.push(canvas.toDataURL('image/jpeg', 0.6));
+                isLoading.value = true;
+                loadingText.value = '压缩图片中...';
+                setTimeout(() => {
+                    const maxProcess = 5;
+                    const count = Math.min(files.length, maxProcess);
+                    let processed = 0;
+                    for (let i = 0; i < count; i++) {
+                        const reader = new FileReader();
+                        reader.onload = (evt) => {
+                            const img = new Image();
+                            img.onload = () => {
+                                const canvas = document.createElement('canvas');
+                                const ctx = canvas.getContext('2d');
+                                const maxWidth = 500; 
+                                const scale = maxWidth / img.width;
+                                canvas.width = maxWidth;
+                                canvas.height = img.height * scale;
+                                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                                formData.images.push(canvas.toDataURL('image/jpeg', 0.6));
+                                processed++;
+                                if(processed === count) isLoading.value = false;
+                            };
+                            img.src = evt.target.result;
                         };
-                        img.src = evt.target.result;
-                    };
-                    reader.readAsDataURL(files[i]);
-                }
+                        reader.readAsDataURL(files[i]);
+                    }
+                }, 100);
             };
             
-            const removeImage = (index) => {
-                formData.images.splice(index, 1);
-            };
+            const removeImage = (index) => { formData.images.splice(index, 1); };
 
             const openAddForm = () => {
                 isEditing.value = false;
@@ -508,7 +504,6 @@
 
             const editYarn = (yarn) => {
                 isEditing.value = true;
-                // 深拷贝，兼容旧数据
                 const data = JSON.parse(JSON.stringify(yarn));
                 if (!data.images) data.images = data.image ? [data.image] : [];
                 Object.assign(formData, data);
@@ -520,7 +515,6 @@
             const saveYarn = () => {
                 if (!formData.name || !formData.weight) return alert('请填写名称和重量');
                 const data = { ...formData };
-                // 保存时确保 image 字段也兼容（取第一张），虽然我们主要用 images
                 data.image = data.images.length > 0 ? data.images[0] : '';
                 
                 if (isEditing.value) {
@@ -542,60 +536,75 @@
             const toggleFavorite = (y) => y.isFavorite = !y.isFavorite;
             const confirmDelete = (y) => { if (confirm('确定删除吗？')) { yarns.value = yarns.value.filter(item => item.id !== y.id); currentPage.value = 'home'; }};
 
-            // Excel 导出 (处理多图逻辑: 用 ||| 分割 Base64)
             const exportExcel = () => {
-                const data = yarns.value.map(y => ({
-                    '编号(勿改)': y.id, '名称': y.name, '品牌': y.brand, '成分': y.composition,
-                    '颜色': y.color, '总重量(g)': y.weight, '总价格': y.price, '支数': y.ply,
-                    '来源': y.source, '购买时间': y.buyDate, '已消耗(g)': y.consumed,
-                    '图片数据(勿改)': (y.images || []).join('|||')
-                }));
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), "库存");
-                XLSX.writeFile(wb, "毛线库存备份.xlsx");
+                const nameInput = prompt("请输入备份文件名称:", "毛线库存_" + new Date().toISOString().split('T')[0]);
+                if (!nameInput) return;
+                isLoading.value = true;
+                loadingText.value = '正在打包包含照片的数据...';
+                setTimeout(() => {
+                    try {
+                        const data = yarns.value.map(y => ({
+                            '编号(勿改)': y.id, '名称': y.name, '品牌': y.brand, '成分': y.composition,
+                            '颜色': y.color, '总重量(g)': y.weight, '总价格': y.price, '支数': y.ply,
+                            '来源': y.source, '购买时间': y.buyDate, '已消耗(g)': y.consumed,
+                            '图片数据(勿改)': (y.images || []).join('|||')
+                        }));
+                        const wb = XLSX.utils.book_new();
+                        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), "库存");
+                        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+                        const blob = new Blob([wbout], { type: 'application/octet-stream' });
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = nameInput + ".xlsx";
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                        setTimeout(() => { alert("导出成功！\n\n请在 Safari 地址栏查看下载进度，随后转存到【文件】App。"); }, 1000);
+                    } catch (e) { alert("导出失败：" + e.message); } finally { isLoading.value = false; }
+                }, 100);
             };
 
             const importExcel = (e) => {
                 const file = e.target.files[0];
                 if(!file) return;
-                const reader = new FileReader();
-                reader.onload = (evt) => {
-                    const wb = XLSX.read(new Uint8Array(evt.target.result), {type: 'array'});
-                    const jsonData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-                    let added = 0, updated = 0;
-                    jsonData.forEach(row => {
-                        const id = row['编号(勿改)'];
-                        // 解析图片
-                        const imgStr = row['图片数据(勿改)'] || '';
-                        const imgs = imgStr ? imgStr.split('|||') : [];
-                        
-                        const item = {
-                            id: id || Date.now().toString(36) + Math.random().toString(36).substr(2),
-                            name: row['名称'], brand: row['品牌']||'', composition: row['成分']||'',
-                            color: row['颜色']||'', weight: Number(row['总重量(g)'])||0,
-                            price: Number(row['总价格'])||0, ply: row['支数']||'',
-                            source: row['来源']||'', buyDate: row['购买时间']||'',
-                            consumed: Number(row['已消耗(g)'])||0,
-                            images: imgs, image: imgs[0] || '', // 兼容
-                            isFavorite: false, createTime: Date.now()
-                        };
-                        const existIdx = yarns.value.findIndex(y => y.id === id);
-                        if(existIdx > -1) {
-                            // 保留原有收藏状态
-                            yarns.value[existIdx] = { ...item, isFavorite: yarns.value[existIdx].isFavorite };
-                            updated++;
-                        } else {
-                            yarns.value.unshift(item);
-                            added++;
-                        }
-                    });
-                    alert(`导入成功：新增 ${added}, 更新 ${updated}`);
-                    e.target.value = '';
-                };
-                reader.readAsArrayBuffer(file);
+                isLoading.value = true;
+                loadingText.value = '正在恢复数据和照片...';
+                setTimeout(() => {
+                    const reader = new FileReader();
+                    reader.onload = (evt) => {
+                        try {
+                            const wb = XLSX.read(new Uint8Array(evt.target.result), {type: 'array'});
+                            const jsonData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+                            let added = 0, updated = 0;
+                            jsonData.forEach(row => {
+                                const id = row['编号(勿改)'];
+                                const imgStr = row['图片数据(勿改)'] || '';
+                                const imgs = imgStr ? imgStr.split('|||') : [];
+                                const item = {
+                                    id: id || Date.now().toString(36) + Math.random().toString(36).substr(2),
+                                    name: row['名称'], brand: row['品牌']||'', composition: row['成分']||'',
+                                    color: row['颜色']||'', weight: Number(row['总重量(g)'])||0,
+                                    price: Number(row['总价格'])||0, ply: row['支数']||'',
+                                    source: row['来源']||'', buyDate: row['购买时间']||'',
+                                    consumed: Number(row['已消耗(g)'])||0,
+                                    images: imgs, image: imgs[0] || '', 
+                                    isFavorite: false, createTime: Date.now()
+                                };
+                                const existIdx = yarns.value.findIndex(y => y.id === id);
+                                if(existIdx > -1) { yarns.value[existIdx] = { ...item, isFavorite: yarns.value[existIdx].isFavorite }; updated++; } 
+                                else { yarns.value.unshift(item); added++; }
+                            });
+                            alert(`恢复成功：新增 ${added} 条, 更新 ${updated} 条`);
+                        } catch (err) { alert("读取失败"); } finally { isLoading.value = false; e.target.value = ''; }
+                    };
+                    reader.readAsArrayBuffer(file);
+                }, 100);
             };
 
             return {
+                isLoading, loadingText,
                 currentPage, theme, yarns, filterType, sortBy, selectedYarn, formData, options,
                 showOptionModal, editingOptionTitle, editingOptionKey, newOptionInput,
                 themeMap, pageTitle, totalCost, totalWeight, totalConsumed, filteredYarns, computedUnitPrice, isEditing,
