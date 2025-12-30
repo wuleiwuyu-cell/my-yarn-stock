@@ -12,8 +12,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Vue 3 -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <!-- SheetJS (Excel处理) -->
-    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -68,11 +66,13 @@
         .main-tag { position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.6); color: white; font-size: 10px; text-align: center; padding: 2px 0; }
         .spinner { border: 4px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top: 4px solid #ffffff; width: 40px; height: 40px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        [v-cloak] { display: none; }
     </style>
 </head>
 <body>
 
-<div id="app" class="h-full text-gray-700">
+<div id="app" class="h-full text-gray-700" v-cloak>
     <div class="mobile-container">
         
         <!-- 全局加载遮罩 -->
@@ -317,24 +317,25 @@
                     </div>
                 </div>
                 <div class="bg-white p-5 rounded-xl shadow-sm">
-                    <h3 class="font-bold text-gray-700 mb-4 flex items-center"><i class="fas fa-database mr-2 text-theme"></i> 数据备份(含照片)</h3>
+                    <h3 class="font-bold text-gray-700 mb-4 flex items-center"><i class="fas fa-database mr-2 text-theme"></i> 数据备份 (JSON格式)</h3>
                     <div class="flex gap-3">
-                        <button @click="exportExcel" class="flex-1 bg-green-500 text-white py-3 rounded-xl flex items-center justify-center gap-2 shadow-sm active:bg-green-600 transition-colors">
+                        <button @click="exportData" class="flex-1 bg-green-500 text-white py-3 rounded-xl flex items-center justify-center gap-2 shadow-sm active:bg-green-600 transition-colors">
                             <i class="fas fa-file-export"></i> 导出备份
                         </button>
                         <div class="flex-1 relative">
                              <button class="w-full bg-blue-500 text-white py-3 rounded-xl flex items-center justify-center gap-2 shadow-sm active:bg-blue-600 transition-colors">
                                 <i class="fas fa-file-import"></i> 恢复备份
                              </button>
-                             <input type="file" @change="importExcel" accept=".xlsx, .xls" class="absolute top-0 left-0 w-full h-full opacity-0">
+                             <input type="file" @change="importData" accept=".json" class="absolute top-0 left-0 w-full h-full opacity-0">
                         </div>
                     </div>
-                    <p class="text-xs text-gray-400 mt-2 text-center leading-5">
-                        <i class="fas fa-info-circle"></i> iPhone导出指南：<br>
-                        点击导出 -> 点击"下载" -> 点击地址栏蓝色箭头 -> 点击下载项 -> 点击左下角"分享" -> 选择"存储到'文件'"。
-                    </p>
+                    <div class="bg-blue-50 text-blue-700 text-xs p-3 rounded-lg mt-3 leading-5 border border-blue-100">
+                        <p class="font-bold mb-1">💡 强烈推荐使用此功能</p>
+                        <p>JSON格式是数据的完美克隆，没有Excel的字符限制，能100%还原您的所有照片和记录，且速度极快。</p>
+                        <p class="mt-1 text-gray-500">操作指南：导出后请点击 Safari 下载栏，将文件存储到【文件】APP。</p>
+                    </div>
                 </div>
-                <div class="text-center text-gray-400 text-xs pt-4">我的毛线仓库 v2.5 (照片丢失修复版)</div>
+                <div class="text-center text-gray-400 text-xs pt-4">我的毛线仓库 v3.0 (极速JSON版)</div>
             </div>
         </main>
 
@@ -370,7 +371,6 @@
 
     createApp({
         setup() {
-            // --- Loading State ---
             const isLoading = ref(false);
             const loadingText = ref('处理中...');
 
@@ -441,9 +441,7 @@
                 if (savedYarns) {
                     let parsed = JSON.parse(savedYarns);
                     parsed.forEach(y => {
-                        if (!y.images) {
-                            y.images = y.image ? [y.image] : [];
-                        }
+                        if (!y.images) { y.images = y.image ? [y.image] : []; }
                     });
                     yarns.value = parsed;
                 }
@@ -462,7 +460,7 @@
                 const files = e.target.files;
                 if (!files.length) return;
                 isLoading.value = true;
-                loadingText.value = '压缩图片中...';
+                loadingText.value = '处理照片中...';
                 setTimeout(() => {
                     const maxProcess = 5;
                     const count = Math.min(files.length, maxProcess);
@@ -487,7 +485,7 @@
                         };
                         reader.readAsDataURL(files[i]);
                     }
-                }, 100);
+                }, 50);
             };
             
             const removeImage = (index) => { formData.images.splice(index, 1); };
@@ -523,4 +521,88 @@
                     }
                 } else {
                     data.id = Date.now().toString(36) + Math.random().toString(36).substr(2);
-                    data.crea
+                    data.createTime = Date.now();
+                    yarns.value.unshift(data);
+                    currentPage.value = 'home';
+                }
+            };
+
+            const viewDetail = (y) => { selectedYarn.value = y; currentPage.value = 'detail'; };
+            const toggleFavorite = (y) => y.isFavorite = !y.isFavorite;
+            const confirmDelete = (y) => { if (confirm('确定删除吗？')) { yarns.value = yarns.value.filter(item => item.id !== y.id); currentPage.value = 'home'; }};
+
+            // --- 切换为 JSON 备份逻辑 (移除 SheetJS 依赖) ---
+            const exportData = () => {
+                const nameInput = prompt("请输入备份文件名:", "毛线库存备份_" + new Date().toISOString().split('T')[0]);
+                if (!nameInput) return;
+                isLoading.value = true;
+                loadingText.value = '正在生成备份文件...';
+                
+                setTimeout(() => {
+                    try {
+                        const jsonStr = JSON.stringify(yarns.value);
+                        const blob = new Blob([jsonStr], { type: 'application/json' });
+                        const url = window.URL.createObjectURL(blob);
+                        
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = nameInput + ".json";
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                        
+                        setTimeout(() => { alert("备份已生成！\n请点击 Safari 地址栏的下载图标，将 .json 文件存储到【文件】App中妥善保存。"); }, 500);
+                    } catch (e) { alert("备份失败：" + e.message); } finally { isLoading.value = false; }
+                }, 100);
+            };
+
+            const importData = (e) => {
+                const file = e.target.files[0];
+                if(!file) return;
+                isLoading.value = true;
+                loadingText.value = '正在恢复数据...';
+                
+                setTimeout(() => {
+                    const reader = new FileReader();
+                    reader.onload = (evt) => {
+                        try {
+                            const importedYarns = JSON.parse(evt.target.result);
+                            if (!Array.isArray(importedYarns)) throw new Error("格式错误");
+                            
+                            let added = 0, updated = 0;
+                            importedYarns.forEach(item => {
+                                // 基础数据校验
+                                if (!item.id || !item.name) return;
+                                
+                                const existIdx = yarns.value.findIndex(y => y.id === item.id);
+                                if(existIdx > -1) { 
+                                    // 覆盖更新，但保留本地收藏状态(可选)
+                                    yarns.value[existIdx] = { ...item, isFavorite: yarns.value[existIdx].isFavorite }; 
+                                    updated++; 
+                                } else { 
+                                    yarns.value.unshift(item); 
+                                    added++; 
+                                }
+                            });
+                            alert(`恢复成功：新增 ${added} 条, 更新 ${updated} 条`);
+                        } catch (err) { alert("恢复失败：文件格式不正确或已损坏"); } finally { isLoading.value = false; e.target.value = ''; }
+                    };
+                    reader.readAsText(file);
+                }, 100);
+            };
+
+            return {
+                isLoading, loadingText,
+                currentPage, theme, yarns, filterType, sortBy, selectedYarn, formData, options,
+                showOptionModal, editingOptionTitle, editingOptionKey, newOptionInput,
+                themeMap, pageTitle, totalCost, totalWeight, totalConsumed, filteredYarns, computedUnitPrice, isEditing,
+                goBack, openAddForm, editYarn, saveYarn, handleImageUpload, removeImage, appendMaterial,
+                viewDetail, toggleFavorite, confirmDelete, exportData, importData,
+                openOptionManager, addOption, removeOption
+            };
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>
