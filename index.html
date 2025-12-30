@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="毛线仓库">
     <title>我的毛线仓库 - 个人毛线管理</title>
     
     <!-- Tailwind CSS -->
@@ -17,44 +18,26 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
-        /* --- 核心修复：定义默认变量（Fallback）--- */
-        :root {
-            --primary: #fb7185;
-            --bg-light: #fff1f2;
-            --text-theme: #881337;
-        }
+        /* --- 核心变量 --- */
+        :root { --primary: #fb7185; --bg-light: #fff1f2; --text-theme: #881337; }
 
         /* 基础样式 */
         body { 
-            margin: 0; padding: 0; 
-            background-color: #e5e7eb; 
+            margin: 0; padding: 0; background-color: #e5e7eb; 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            -webkit-tap-highlight-color: transparent;
+            -webkit-tap-highlight-color: transparent; select { -webkit-appearance: none; }
         }
         
-        /* 移动端容器 */
         .mobile-container {
-            max-width: 480px;
-            margin: 0 auto;
-            height: 100vh; /* Fallback */
-            height: 100dvh; 
-            background-color: #f9fafb;
-            box-shadow: 0 0 20px rgba(0,0,0,0.1);
-            position: relative;
-            display: flex;
-            flex-direction: column;
+            max-width: 480px; margin: 0 auto; height: 100vh; height: 100dvh; 
+            background-color: #f9fafb; box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            position: relative; display: flex; flex-direction: column;
         }
 
-        /* 滚动条隐藏 */
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         
-        .image-preview {
-            width: 100%; height: 200px; object-fit: cover;
-            border-radius: 12px; background-color: #e5e7eb;
-        }
-
-        /* 强制覆盖样式的工具类 - 这里的 !important 确保优先级 */
+        /* 强制样式 */
         .bg-theme { background-color: var(--primary) !important; }
         .bg-theme-light { background-color: var(--bg-light) !important; }
         .text-theme { color: var(--text-theme) !important; }
@@ -68,6 +51,25 @@
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.5); z-index: 50;
             display: flex; align-items: center; justify-content: center;
+        }
+
+        /* 图片列表网格 */
+        .image-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+        }
+        .image-item {
+            aspect-ratio: 1; border-radius: 8px; overflow: hidden; position: relative;
+            background-color: #f3f4f6; border: 1px solid #e5e7eb;
+        }
+        .image-item img { width: 100%; height: 100%; object-fit: cover; }
+        .delete-btn {
+            position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.5);
+            color: white; border-radius: 50%; width: 20px; height: 20px;
+            display: flex; align-items: center; justify-content: center; font-size: 12px;
+        }
+        .main-tag {
+            position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.6);
+            color: white; font-size: 10px; text-align: center; padding: 2px 0;
         }
     </style>
 </head>
@@ -88,7 +90,6 @@
                     {{ pageTitle }}
                 </h1>
 
-                <!-- 顶部右侧按钮 -->
                 <button v-if="currentPage === 'form'" @click="saveYarn" class="font-bold text-sm bg-white/20 px-3 py-1 rounded-full">保存</button>
                 <button v-else-if="currentPage === 'detail'" @click="editYarn(selectedYarn)" class="w-8 h-8"><i class="fas fa-edit"></i></button>
                 <div v-else class="w-8"></div>
@@ -100,8 +101,8 @@
             
             <!-- 1. 主页 -->
             <div v-if="currentPage === 'home'" class="space-y-4">
-                <!-- 统计卡片 -->
-                <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 grid grid-cols-2 gap-4">
+                <!-- 统计 -->
+                <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 grid grid-cols-2 gap-4">
                     <div>
                         <div class="text-xs text-gray-400 mb-1">库存总重</div>
                         <div class="text-2xl font-bold text-gray-800">{{ (totalWeight / 500).toFixed(1) }} <span class="text-sm font-normal text-gray-500">斤</span></div>
@@ -110,30 +111,21 @@
                         <div class="text-xs text-gray-400 mb-1">总花费</div>
                         <div class="text-2xl font-bold text-gray-800">¥{{ totalCost }}</div>
                     </div>
-                    <div class="col-span-2 border-t border-gray-100 pt-3 flex justify-between text-sm">
-                        <span class="text-gray-500">数量: <b class="text-gray-800">{{ yarns.length }}</b> 团</span>
-                        <span class="text-gray-500">已用: <b class="text-gray-800">{{ (totalConsumed / 500).toFixed(1) }}</b> 斤</span>
+                    <div class="col-span-2 border-t border-gray-100 pt-2 flex justify-between text-sm">
+                        <span class="text-gray-500">数量: <b>{{ yarns.length }}</b> 团</span>
+                        <span class="text-gray-500">已用: <b>{{ (totalConsumed / 500).toFixed(1) }}</b> 斤</span>
                     </div>
                 </div>
 
-                <!-- 筛选排序 -->
+                <!-- 筛选 -->
                 <div class="flex items-center gap-3 overflow-x-auto pb-2 hide-scrollbar">
-                    <button @click="filterType = 'all'" 
-                        class="flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors"
-                        :class="filterType === 'all' ? 'bg-theme text-white shadow-md' : 'bg-white text-gray-600 border border-gray-200'">
-                        全部
-                    </button>
-                    <button @click="filterType = 'fav'" 
-                        class="flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors"
-                        :class="filterType === 'fav' ? 'bg-theme text-white shadow-md' : 'bg-white text-gray-600 border border-gray-200'">
-                        收藏 <i class="fas fa-heart text-xs ml-1" :class="filterType==='fav'?'text-white':'text-red-400'"></i>
-                    </button>
+                    <button @click="filterType = 'all'" :class="filterType === 'all' ? 'bg-theme text-white shadow-md' : 'bg-white text-gray-600 border'" class="flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium">全部</button>
+                    <button @click="filterType = 'fav'" :class="filterType === 'fav' ? 'bg-theme text-white shadow-md' : 'bg-white text-gray-600 border'" class="flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium">收藏 ❤️</button>
                     <div class="w-px h-6 bg-gray-300 flex-shrink-0 mx-1"></div>
                     <select v-model="sortBy" class="flex-shrink-0 px-3 py-1.5 rounded-full text-sm border border-gray-200 bg-white text-gray-600 outline-none">
                         <option value="dateDesc">最新添加</option>
                         <option value="priceDesc">单价(高到低)</option>
-                        <option value="weightDesc">剩余重量(多到少)</option>
-                        <option value="brand">按品牌</option>
+                        <option value="weightDesc">余量(多到少)</option>
                     </select>
                 </div>
 
@@ -141,17 +133,21 @@
                 <div class="space-y-3">
                     <div v-if="filteredYarns.length === 0" class="text-center py-20 opacity-50">
                         <i class="fas fa-box-open text-5xl mb-3 text-gray-300"></i>
-                        <p class="text-gray-500">仓库空空如也，点右下角添加</p>
+                        <p class="text-gray-500">暂无数据</p>
                     </div>
 
                     <div v-for="yarn in filteredYarns" :key="yarn.id" @click="viewDetail(yarn)" 
                         class="bg-white rounded-xl p-3 shadow-sm active:scale-[0.98] transition-transform duration-100 flex gap-3 border border-gray-100">
                         <div class="w-24 h-24 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden relative">
-                            <img v-if="yarn.image" :src="yarn.image" class="w-full h-full object-cover">
+                            <!-- 显示第一张图作为封面 -->
+                            <img v-if="yarn.images && yarn.images.length > 0" :src="yarn.images[0]" class="w-full h-full object-cover">
                             <div v-else class="w-full h-full flex items-center justify-center text-gray-300">
                                 <i class="fas fa-image text-xl"></i>
                             </div>
-                            <div v-if="yarn.isFavorite" class="absolute top-1 right-1 bg-white/80 rounded-full w-5 h-5 flex items-center justify-center">
+                            <div v-if="yarn.images && yarn.images.length > 1" class="absolute bottom-1 right-1 bg-black/50 text-white text-[10px] px-1.5 rounded-sm backdrop-blur-sm">
+                                +{{ yarn.images.length }}
+                            </div>
+                            <div v-if="yarn.isFavorite" class="absolute top-1 right-1 bg-white/90 rounded-full w-5 h-5 flex items-center justify-center shadow-sm">
                                 <i class="fas fa-heart text-red-500 text-xs"></i>
                             </div>
                         </div>
@@ -176,23 +172,38 @@
                 </div>
             </div>
 
-            <!-- 2. 编辑/添加 -->
+            <!-- 2. 编辑/添加 (支持多图) -->
             <div v-if="currentPage === 'form'" class="space-y-5">
+                <!-- 图片上传区 -->
                 <div class="bg-white p-4 rounded-xl shadow-sm">
-                    <div class="relative" @click="$refs.fileInput.click()">
-                        <img v-if="formData.image" :src="formData.image" class="image-preview border-2 border-dashed border-theme">
-                        <div v-else class="image-preview border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 bg-gray-50">
-                            <i class="fas fa-camera text-3xl mb-2"></i>
-                            <span class="text-sm">点击拍摄/上传照片</span>
-                        </div>
-                        <input type="file" ref="fileInput" accept="image/*" class="hidden" @change="handleImageUpload">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-xs font-bold text-gray-500">照片 ({{formData.images.length}}张)</span>
+                        <span class="text-xs text-gray-400">第一张为主图</span>
                     </div>
+                    
+                    <div class="image-grid">
+                        <!-- 已有图片 -->
+                        <div v-for="(img, idx) in formData.images" :key="idx" class="image-item">
+                            <img :src="img">
+                            <div class="delete-btn" @click.stop="removeImage(idx)"><i class="fas fa-times"></i></div>
+                            <div v-if="idx === 0" class="main-tag">封面</div>
+                        </div>
+                        
+                        <!-- 添加按钮 -->
+                        <div class="image-item flex flex-col items-center justify-center bg-gray-50 text-gray-400 active:bg-gray-100" @click="$refs.fileInput.click()">
+                            <i class="fas fa-camera text-xl mb-1"></i>
+                            <span class="text-xs">添加</span>
+                        </div>
+                    </div>
+                    
+                    <!-- 隐藏的 input, 支持多选 -->
+                    <input type="file" ref="fileInput" accept="image/*" multiple class="hidden" @change="handleImageUpload">
                 </div>
 
                 <div class="bg-white p-5 rounded-xl shadow-sm space-y-4">
                     <div>
-                        <label class="text-xs font-bold text-gray-500 uppercase">毛线名称 <span class="text-red-500">*</span></label>
-                        <input v-model="formData.name" type="text" class="w-full mt-1 p-2 bg-gray-50 border-b-2 border-transparent focus:border-theme outline-none transition-colors" placeholder="输入名称">
+                        <label class="text-xs font-bold text-gray-500">名称 <span class="text-red-500">*</span></label>
+                        <input v-model="formData.name" type="text" class="w-full mt-1 p-2 bg-gray-50 border-b-2 border-transparent focus:border-theme outline-none" placeholder="输入名称">
                     </div>
 
                     <div class="grid grid-cols-2 gap-4">
@@ -221,11 +232,11 @@
 
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <label class="text-xs font-bold text-gray-500">总重量 (g) <span class="text-red-500">*</span></label>
+                            <label class="text-xs font-bold text-gray-500">总重量(g) <span class="text-red-500">*</span></label>
                             <input v-model.number="formData.weight" type="number" class="w-full mt-1 p-2 bg-gray-50 rounded font-mono">
                         </div>
                         <div>
-                            <label class="text-xs font-bold text-gray-500">总价格 (元) <span class="text-red-500">*</span></label>
+                            <label class="text-xs font-bold text-gray-500">总价格(元) <span class="text-red-500">*</span></label>
                             <input v-model.number="formData.price" type="number" class="w-full mt-1 p-2 bg-gray-50 rounded font-mono">
                         </div>
                     </div>
@@ -249,7 +260,7 @@
                             <input v-model="formData.buyDate" type="date" class="w-full mt-1 p-2 bg-gray-50 rounded text-sm">
                         </div>
                         <div>
-                            <label class="text-xs font-bold text-gray-500">已消耗 (g)</label>
+                            <label class="text-xs font-bold text-gray-500">已消耗(g)</label>
                             <input v-model.number="formData.consumed" type="number" class="w-full mt-1 p-2 bg-gray-50 rounded font-mono">
                         </div>
                     </div>
@@ -261,18 +272,31 @@
                 </div>
             </div>
 
-            <!-- 3. 详情页 -->
+            <!-- 3. 详情页 (多图轮播) -->
             <div v-if="currentPage === 'detail' && selectedYarn" class="space-y-4">
-                <div class="relative">
-                    <img v-if="selectedYarn.image" :src="selectedYarn.image" class="w-full h-72 object-cover rounded-2xl shadow-sm">
-                    <div v-else class="w-full h-40 bg-gray-200 rounded-2xl flex items-center justify-center text-gray-400">无图片</div>
+                <div class="relative bg-black rounded-2xl overflow-hidden shadow-sm" style="min-height: 280px;">
+                    <!-- 图片容器 -->
+                    <div class="flex overflow-x-auto hide-scrollbar snap-x snap-mandatory" style="height: 300px;">
+                         <div v-if="!selectedYarn.images || selectedYarn.images.length === 0" class="w-full flex-shrink-0 flex items-center justify-center bg-gray-200 h-full text-gray-400">
+                             无图片
+                         </div>
+                         <div v-for="(img, idx) in selectedYarn.images" :key="idx" class="w-full flex-shrink-0 snap-center h-full relative">
+                             <img :src="img" class="w-full h-full object-contain bg-black/90">
+                             <div class="absolute bottom-4 right-4 bg-black/50 text-white px-2 py-1 rounded-full text-xs">
+                                 {{ idx + 1 }} / {{ selectedYarn.images.length }}
+                             </div>
+                         </div>
+                    </div>
                     
-                    <button @click="toggleFavorite(selectedYarn)" class="absolute bottom-[-20px] right-6 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center text-xl z-10">
+                    <button @click="toggleFavorite(selectedYarn)" class="absolute bottom-[-20px] right-6 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center text-xl z-10" style="bottom: 10px;">
                         <i :class="['fas fa-heart', selectedYarn.isFavorite ? 'text-red-500' : 'text-gray-300']"></i>
                     </button>
                 </div>
+                <div class="text-center text-xs text-gray-400" v-if="selectedYarn.images && selectedYarn.images.length > 1">
+                    <i class="fas fa-arrow-left mr-1"></i> 左右滑动查看更多图片 <i class="fas fa-arrow-right ml-1"></i>
+                </div>
 
-                <div class="bg-white pt-8 pb-6 px-6 rounded-2xl shadow-sm mt-[-30px] relative z-0">
+                <div class="bg-white pt-6 pb-6 px-6 rounded-2xl shadow-sm relative z-0">
                     <h2 class="text-2xl font-bold text-gray-800">{{ selectedYarn.name }}</h2>
                     <p class="text-sm text-gray-500 mt-1">{{ selectedYarn.composition }}</p>
 
@@ -286,136 +310,66 @@
                             <div class="text-xl font-bold text-gray-700">¥{{ (selectedYarn.price / (selectedYarn.weight/500)).toFixed(0) }}</div>
                         </div>
                     </div>
-
+                    
                     <div class="space-y-3 text-sm">
-                        <div class="flex border-b border-gray-100 pb-2">
-                            <span class="text-gray-400 w-20">品牌</span><span class="text-gray-800">{{ selectedYarn.brand || '未记录' }}</span>
-                        </div>
-                        <div class="flex border-b border-gray-100 pb-2">
-                            <span class="text-gray-400 w-20">颜色</span><span class="text-gray-800">{{ selectedYarn.color || '未记录' }}</span>
-                        </div>
-                        <div class="flex border-b border-gray-100 pb-2">
-                            <span class="text-gray-400 w-20">支数</span><span class="text-gray-800">{{ selectedYarn.ply || '未记录' }}</span>
-                        </div>
-                        <div class="flex border-b border-gray-100 pb-2">
-                            <span class="text-gray-400 w-20">来源</span><span class="text-gray-800">{{ selectedYarn.source || '未记录' }}</span>
-                        </div>
-                        <div class="flex border-b border-gray-100 pb-2">
-                            <span class="text-gray-400 w-20">购入日期</span><span class="text-gray-800">{{ selectedYarn.buyDate || '未记录' }}</span>
-                        </div>
+                        <div class="flex border-b border-gray-100 pb-2"><span class="text-gray-400 w-20">品牌</span><span class="text-gray-800">{{ selectedYarn.brand || '-' }}</span></div>
+                        <div class="flex border-b border-gray-100 pb-2"><span class="text-gray-400 w-20">颜色</span><span class="text-gray-800">{{ selectedYarn.color || '-' }}</span></div>
+                        <div class="flex border-b border-gray-100 pb-2"><span class="text-gray-400 w-20">支数</span><span class="text-gray-800">{{ selectedYarn.ply || '-' }}</span></div>
+                        <div class="flex border-b border-gray-100 pb-2"><span class="text-gray-400 w-20">来源</span><span class="text-gray-800">{{ selectedYarn.source || '-' }}</span></div>
+                        <div class="flex border-b border-gray-100 pb-2"><span class="text-gray-400 w-20">购买日期</span><span class="text-gray-800">{{ selectedYarn.buyDate || '-' }}</span></div>
                     </div>
                 </div>
 
-                <button @click="confirmDelete(selectedYarn)" class="w-full py-3 text-red-500 bg-white border border-red-100 rounded-xl font-bold active:bg-red-50">
-                    <i class="fas fa-trash-alt mr-2"></i> 删除此记录
-                </button>
+                <button @click="confirmDelete(selectedYarn)" class="w-full py-3 text-red-500 bg-white border border-red-100 rounded-xl font-bold active:bg-red-50">删除记录</button>
             </div>
 
             <!-- 4. 设置页面 -->
             <div v-if="currentPage === 'settings'" class="space-y-5">
-                <!-- 主题 -->
                 <div class="bg-white p-5 rounded-xl shadow-sm">
-                    <h3 class="font-bold text-gray-700 mb-4 flex items-center">
-                        <i class="fas fa-palette mr-2 text-theme"></i> 主题颜色
-                    </h3>
+                    <h3 class="font-bold text-gray-700 mb-4 flex items-center"><i class="fas fa-palette mr-2 text-theme"></i> 主题颜色</h3>
                     <div class="flex justify-between px-2">
-                        <button v-for="c in ['pink','blue','purple','orange','gray']" :key="c"
-                            @click="theme = c"
-                            class="w-10 h-10 rounded-full ring-2 ring-offset-2 transition-all"
-                            :style="{backgroundColor: themeMap[c].primary}"
-                            :class="theme===c?'ring-gray-400 scale-110':'ring-transparent'">
-                        </button>
+                        <button v-for="c in ['pink','blue','purple','orange','gray']" :key="c" @click="theme = c" class="w-10 h-10 rounded-full ring-2 ring-offset-2 transition-all" :style="{backgroundColor: themeMap[c].primary}" :class="theme===c?'ring-gray-400 scale-110':'ring-transparent'"></button>
                     </div>
                 </div>
 
-                <!-- 选项管理 -->
                 <div class="bg-white p-5 rounded-xl shadow-sm">
-                    <h3 class="font-bold text-gray-700 mb-4 flex items-center">
-                        <i class="fas fa-list-ul mr-2 text-theme"></i> 下拉选项管理
-                    </h3>
+                    <h3 class="font-bold text-gray-700 mb-4 flex items-center"><i class="fas fa-list-ul mr-2 text-theme"></i> 选项管理</h3>
                     <div class="space-y-3">
-                        <button @click="openOptionManager('brands', '品牌')" class="w-full flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100">
-                            <span>🧶 品牌管理</span> <i class="fas fa-chevron-right text-gray-400"></i>
-                        </button>
-                        <button @click="openOptionManager('materials', '成分')" class="w-full flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100">
-                            <span>🐑 成分管理</span> <i class="fas fa-chevron-right text-gray-400"></i>
-                        </button>
-                        <button @click="openOptionManager('colors', '颜色')" class="w-full flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100">
-                            <span>🎨 颜色管理</span> <i class="fas fa-chevron-right text-gray-400"></i>
-                        </button>
-                        <button @click="openOptionManager('plies', '支数')" class="w-full flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100">
-                            <span>📏 支数管理</span> <i class="fas fa-chevron-right text-gray-400"></i>
-                        </button>
-                        <button @click="openOptionManager('sources', '来源')" class="w-full flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100">
-                            <span>🏪 来源管理</span> <i class="fas fa-chevron-right text-gray-400"></i>
+                        <button v-for="(v, k) in {brands:'品牌', materials:'成分', colors:'颜色', plies:'支数', sources:'来源'}" :key="k" @click="openOptionManager(k, v)" class="w-full flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100">
+                            <span>{{v}}管理</span> <i class="fas fa-chevron-right text-gray-400"></i>
                         </button>
                     </div>
                 </div>
 
-                <!-- 备份 -->
                 <div class="bg-white p-5 rounded-xl shadow-sm">
-                    <h3 class="font-bold text-gray-700 mb-4 flex items-center">
-                        <i class="fas fa-database mr-2 text-theme"></i> 数据备份
-                    </h3>
+                    <h3 class="font-bold text-gray-700 mb-4 flex items-center"><i class="fas fa-database mr-2 text-theme"></i> 数据备份</h3>
                     <div class="flex gap-3">
-                        <button @click="exportExcel" class="flex-1 bg-green-500 active:bg-green-600 text-white py-3 rounded-xl flex items-center justify-center gap-2 shadow-sm">
-                            <i class="fas fa-file-export"></i> 导出
-                        </button>
+                        <button @click="exportExcel" class="flex-1 bg-green-500 text-white py-3 rounded-xl flex items-center justify-center gap-2 shadow-sm"><i class="fas fa-file-export"></i> 导出</button>
                         <div class="flex-1 relative">
-                             <button class="w-full bg-blue-500 active:bg-blue-600 text-white py-3 rounded-xl flex items-center justify-center gap-2 shadow-sm">
-                                <i class="fas fa-file-import"></i> 导入
-                             </button>
-                             <input type="file" @change="importExcel" accept=".xlsx, .xls" class="absolute top-0 left-0 w-full h-full opacity-0 cursor-pointer">
+                             <button class="w-full bg-blue-500 text-white py-3 rounded-xl flex items-center justify-center gap-2 shadow-sm"><i class="fas fa-file-import"></i> 导入</button>
+                             <input type="file" @change="importExcel" accept=".xlsx, .xls" class="absolute top-0 left-0 w-full h-full opacity-0">
                         </div>
                     </div>
+                    <p class="text-xs text-gray-400 mt-2 text-center">建议每月导出一次，防止清理缓存导致数据丢失</p>
                 </div>
-                
-                <div class="text-center text-gray-400 text-xs pt-4">
-                    我的毛线仓库 v1.3
-                </div>
+                <div class="text-center text-gray-400 text-xs pt-4">我的毛线仓库 v2.0 (多图版)</div>
             </div>
         </main>
 
-        <!-- 悬浮按钮 -->
-        <button v-if="currentPage === 'home'" @click="openAddForm" 
-            class="fixed bottom-24 right-6 w-14 h-14 bg-theme text-white rounded-full shadow-lg shadow-gray-400/50 flex items-center justify-center text-2xl z-30 transition-transform active:scale-95">
-            <i class="fas fa-plus"></i>
-        </button>
+        <button v-if="currentPage === 'home'" @click="openAddForm" class="fixed bottom-24 right-6 w-14 h-14 bg-theme text-white rounded-full shadow-lg shadow-gray-400/50 flex items-center justify-center text-2xl z-30 transition-transform active:scale-95"><i class="fas fa-plus"></i></button>
 
-        <!-- 底部导航 -->
         <nav class="absolute bottom-0 w-full bg-white border-t border-gray-200 h-16 flex z-40 pb-safe">
-            <button @click="currentPage = 'home'" class="flex-1 flex flex-col items-center justify-center gap-1 transition-colors" :class="currentPage!=='settings' ? 'text-theme' : 'text-gray-400'">
-                <i class="fas fa-home text-xl"></i>
-                <span class="text-xs font-medium">仓库</span>
-            </button>
-            <button @click="currentPage = 'settings'" class="flex-1 flex flex-col items-center justify-center gap-1 transition-colors" :class="currentPage==='settings' ? 'text-theme' : 'text-gray-400'">
-                <i class="fas fa-cog text-xl"></i>
-                <span class="text-xs font-medium">设置</span>
-            </button>
+            <button @click="currentPage = 'home'" class="flex-1 flex flex-col items-center justify-center gap-1 transition-colors" :class="currentPage!=='settings' ? 'text-theme' : 'text-gray-400'"><i class="fas fa-home text-xl"></i><span class="text-xs font-medium">仓库</span></button>
+            <button @click="currentPage = 'settings'" class="flex-1 flex flex-col items-center justify-center gap-1 transition-colors" :class="currentPage==='settings' ? 'text-theme' : 'text-gray-400'"><i class="fas fa-cog text-xl"></i><span class="text-xs font-medium">设置</span></button>
         </nav>
 
-        <!-- 模态框：选项管理 -->
         <div v-if="showOptionModal" class="modal-mask" @click.self="showOptionModal = false">
             <div class="bg-white w-4/5 max-w-sm rounded-xl p-5 shadow-2xl">
-                <div class="flex justify-between items-center mb-4 border-b pb-2">
-                    <h3 class="font-bold text-gray-800">管理：{{ editingOptionTitle }}</h3>
-                    <button @click="showOptionModal = false" class="text-gray-400"><i class="fas fa-times"></i></button>
-                </div>
-                
-                <div class="flex gap-2 mb-4">
-                    <input v-model="newOptionInput" type="text" class="flex-1 border rounded p-2 text-sm" placeholder="输入新选项">
-                    <button @click="addOption" class="bg-theme text-white px-4 rounded text-sm">添加</button>
-                </div>
-
-                <div class="max-h-60 overflow-y-auto space-y-2 pr-1">
-                    <div v-for="(item, index) in options[editingOptionKey]" :key="index" class="flex justify-between items-center bg-gray-50 p-2 rounded text-sm group">
-                        <span>{{ item }}</span>
-                        <button @click="removeOption(index)" class="text-gray-300 hover:text-red-500"><i class="fas fa-trash-alt"></i></button>
-                    </div>
-                </div>
+                <div class="flex justify-between items-center mb-4 border-b pb-2"><h3 class="font-bold text-gray-800">管理：{{ editingOptionTitle }}</h3><button @click="showOptionModal = false" class="text-gray-400"><i class="fas fa-times"></i></button></div>
+                <div class="flex gap-2 mb-4"><input v-model="newOptionInput" type="text" class="flex-1 border rounded p-2 text-sm" placeholder="新选项"><button @click="addOption" class="bg-theme text-white px-4 rounded text-sm">添加</button></div>
+                <div class="max-h-60 overflow-y-auto space-y-2 pr-1"><div v-for="(item, index) in options[editingOptionKey]" :key="index" class="flex justify-between items-center bg-gray-50 p-2 rounded text-sm group"><span>{{ item }}</span><button @click="removeOption(index)" class="text-gray-300 hover:text-red-500"><i class="fas fa-trash-alt"></i></button></div></div>
             </div>
         </div>
-
     </div>
 </div>
 
@@ -424,9 +378,7 @@
 
     createApp({
         setup() {
-            // --- 修复主题：通过 JS 直接操作 Root CSS 变量 ---
             const theme = ref(localStorage.getItem('coil_theme') || 'pink');
-            
             const themeMap = {
                 pink: { primary: '#fb7185', bgLight: '#fff1f2', text: '#881337' },
                 blue: { primary: '#2dd4bf', bgLight: '#f0fdfa', text: '#134e4a' },
@@ -435,7 +387,6 @@
                 orange: { primary: '#fbbf24', bgLight: '#fffbeb', text: '#78350f' }
             };
 
-            // 监听 theme 变化，直接更新 document 样式，确保万无一失
             watch(theme, (newVal) => {
                 const t = themeMap[newVal] || themeMap['pink'];
                 document.documentElement.style.setProperty('--primary', t.primary);
@@ -444,7 +395,6 @@
                 localStorage.setItem('coil_theme', newVal);
             }, { immediate: true });
 
-            // --- 其他逻辑保持不变 ---
             const currentPage = ref('home');
             const yarns = ref([]);
             
@@ -456,14 +406,14 @@
                 sources: ['百百', '老常', '傻小子', '意达']
             };
             const options = reactive(JSON.parse(localStorage.getItem('coil_options')) || defaultOptions);
-
             const filterType = ref('all');
             const sortBy = ref('dateDesc');
             const selectedYarn = ref(null);
             const isEditing = ref(false);
 
+            // 表单数据，注意 images 是数组
             const formData = reactive({
-                id: null, name: '', image: '', brand: '', color: '', composition: '',
+                id: null, name: '', images: [], brand: '', color: '', composition: '',
                 weight: 500, price: 0, ply: '', source: '', buyDate: '', consumed: 0,
                 isFavorite: false, createTime: 0
             });
@@ -473,21 +423,12 @@
             const editingOptionTitle = ref('');
             const newOptionInput = ref('');
 
-            // --- 计算属性 ---
-            const pageTitle = computed(() => {
-                const titles = { home: '我的毛线仓库', settings: '设置', form: isEditing.value ? '编辑记录' : '入库登记', detail: '详情' };
-                return titles[currentPage.value];
-            });
-
+            const pageTitle = computed(() => ({ home: '我的毛线仓库', settings: '设置', form: isEditing.value ? '编辑记录' : '入库登记', detail: '详情' }[currentPage.value]));
             const totalCost = computed(() => yarns.value.reduce((sum, y) => sum + (y.price || 0), 0));
             const totalWeight = computed(() => yarns.value.reduce((sum, y) => sum + (y.weight || 0), 0));
             const totalConsumed = computed(() => yarns.value.reduce((sum, y) => sum + (y.consumed || 0), 0));
+            const computedUnitPrice = computed(() => (!formData.weight || formData.weight === 0) ? 0 : (formData.price / (formData.weight / 500)).toFixed(1));
             
-            const computedUnitPrice = computed(() => {
-                if(!formData.weight || formData.weight === 0) return 0;
-                return (formData.price / (formData.weight / 500)).toFixed(1);
-            });
-
             const filteredYarns = computed(() => {
                 let list = [...yarns.value];
                 if (filterType.value === 'fav') list = list.filter(y => y.isFavorite);
@@ -495,87 +436,93 @@
                     if (sortBy.value === 'dateDesc') return b.createTime - a.createTime;
                     if (sortBy.value === 'priceDesc') return (b.price/b.weight) - (a.price/a.weight);
                     if (sortBy.value === 'weightDesc') return (b.weight - (b.consumed||0)) - (a.weight - (a.consumed||0));
-                    if (sortBy.value === 'brand') return (a.brand || '').localeCompare(b.brand || '');
                     return 0;
                 });
                 return list;
             });
 
-            // --- 方法 ---
             onMounted(() => {
                 const savedYarns = localStorage.getItem('coil_yarns');
-                if (savedYarns) yarns.value = JSON.parse(savedYarns);
-                for(let key in defaultOptions){
-                    if(!options[key]) options[key] = defaultOptions[key];
+                if (savedYarns) {
+                    let parsed = JSON.parse(savedYarns);
+                    // === 数据迁移逻辑：将旧版 image 字段转换为 images 数组 ===
+                    parsed.forEach(y => {
+                        if (!y.images) {
+                            y.images = y.image ? [y.image] : [];
+                        }
+                    });
+                    yarns.value = parsed;
                 }
+                for(let key in defaultOptions) if(!options[key]) options[key] = defaultOptions[key];
             });
 
             watch(yarns, () => localStorage.setItem('coil_yarns', JSON.stringify(yarns.value)), { deep: true });
             watch(options, () => localStorage.setItem('coil_options', JSON.stringify(options)), { deep: true });
 
             const goBack = () => currentPage.value = 'home';
-            
-            const openOptionManager = (key, title) => {
-                editingOptionKey.value = key;
-                editingOptionTitle.value = title;
-                newOptionInput.value = '';
-                showOptionModal.value = true;
-            };
-            const addOption = () => {
-                const val = newOptionInput.value.trim();
-                if(val && !options[editingOptionKey.value].includes(val)) {
-                    options[editingOptionKey.value].push(val);
-                    newOptionInput.value = '';
+            const openOptionManager = (k, t) => { editingOptionKey.value = k; editingOptionTitle.value = t; newOptionInput.value = ''; showOptionModal.value = true; };
+            const addOption = () => { if(newOptionInput.value.trim()){ options[editingOptionKey.value].push(newOptionInput.value.trim()); newOptionInput.value = ''; }};
+            const removeOption = (i) => options[editingOptionKey.value].splice(i, 1);
+
+            // 多图上传处理
+            const handleImageUpload = (e) => {
+                const files = e.target.files;
+                if (!files.length) return;
+                
+                // 限制最多一次加5张，防止卡死
+                const maxProcess = 5;
+                const count = Math.min(files.length, maxProcess);
+
+                for (let i = 0; i < count; i++) {
+                    const reader = new FileReader();
+                    reader.onload = (evt) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+                            // 稍微压缩更狠一点，适配多图存储
+                            const maxWidth = 500; 
+                            const scale = maxWidth / img.width;
+                            canvas.width = maxWidth;
+                            canvas.height = img.height * scale;
+                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                            // 添加到数组
+                            formData.images.push(canvas.toDataURL('image/jpeg', 0.6));
+                        };
+                        img.src = evt.target.result;
+                    };
+                    reader.readAsDataURL(files[i]);
                 }
             };
-            const removeOption = (idx) => {
-                if(confirm('删除此选项？')) options[editingOptionKey.value].splice(idx, 1);
-            };
-
-            const handleImageUpload = (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = (evt) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        const ctx = canvas.getContext('2d');
-                        const maxWidth = 600; 
-                        const scale = maxWidth / img.width;
-                        canvas.width = maxWidth;
-                        canvas.height = img.height * scale;
-                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                        formData.image = canvas.toDataURL('image/jpeg', 0.65);
-                    };
-                    img.src = evt.target.result;
-                };
-                reader.readAsDataURL(file);
+            
+            const removeImage = (index) => {
+                formData.images.splice(index, 1);
             };
 
             const openAddForm = () => {
                 isEditing.value = false;
-                Object.keys(formData).forEach(k => formData[k] = (k==='weight'?500:k==='price'?0:k==='consumed'?0:k==='isFavorite'?false:''));
+                Object.keys(formData).forEach(k => formData[k] = (k==='weight'?500:k==='price'?0:k==='consumed'?0:k==='isFavorite'?false:k==='images'?[]:''));
                 formData.buyDate = new Date().toISOString().split('T')[0];
                 currentPage.value = 'form';
             };
 
             const editYarn = (yarn) => {
                 isEditing.value = true;
-                Object.assign(formData, JSON.parse(JSON.stringify(yarn)));
+                // 深拷贝，兼容旧数据
+                const data = JSON.parse(JSON.stringify(yarn));
+                if (!data.images) data.images = data.image ? [data.image] : [];
+                Object.assign(formData, data);
                 currentPage.value = 'form';
             };
 
-            const appendMaterial = (e) => {
-                if(e.target.value) {
-                    formData.composition = formData.composition ? `${formData.composition} + ${e.target.value}` : e.target.value;
-                    e.target.value = "";
-                }
-            };
+            const appendMaterial = (e) => { if(e.target.value) { formData.composition = formData.composition ? `${formData.composition} + ${e.target.value}` : e.target.value; e.target.value = ""; }};
 
             const saveYarn = () => {
                 if (!formData.name || !formData.weight) return alert('请填写名称和重量');
                 const data = { ...formData };
+                // 保存时确保 image 字段也兼容（取第一张），虽然我们主要用 images
+                data.image = data.images.length > 0 ? data.images[0] : '';
+                
                 if (isEditing.value) {
                     const idx = yarns.value.findIndex(y => y.id === formData.id);
                     if (idx !== -1) {
@@ -593,18 +540,15 @@
 
             const viewDetail = (y) => { selectedYarn.value = y; currentPage.value = 'detail'; };
             const toggleFavorite = (y) => y.isFavorite = !y.isFavorite;
-            const confirmDelete = (y) => {
-                if (confirm('确定删除吗？')) {
-                    yarns.value = yarns.value.filter(item => item.id !== y.id);
-                    currentPage.value = 'home';
-                }
-            };
+            const confirmDelete = (y) => { if (confirm('确定删除吗？')) { yarns.value = yarns.value.filter(item => item.id !== y.id); currentPage.value = 'home'; }};
 
+            // Excel 导出 (处理多图逻辑: 用 ||| 分割 Base64)
             const exportExcel = () => {
                 const data = yarns.value.map(y => ({
                     '编号(勿改)': y.id, '名称': y.name, '品牌': y.brand, '成分': y.composition,
                     '颜色': y.color, '总重量(g)': y.weight, '总价格': y.price, '支数': y.ply,
-                    '来源': y.source, '购买时间': y.buyDate, '已消耗(g)': y.consumed
+                    '来源': y.source, '购买时间': y.buyDate, '已消耗(g)': y.consumed,
+                    '图片数据(勿改)': (y.images || []).join('|||')
                 }));
                 const wb = XLSX.utils.book_new();
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), "库存");
@@ -621,6 +565,10 @@
                     let added = 0, updated = 0;
                     jsonData.forEach(row => {
                         const id = row['编号(勿改)'];
+                        // 解析图片
+                        const imgStr = row['图片数据(勿改)'] || '';
+                        const imgs = imgStr ? imgStr.split('|||') : [];
+                        
                         const item = {
                             id: id || Date.now().toString(36) + Math.random().toString(36).substr(2),
                             name: row['名称'], brand: row['品牌']||'', composition: row['成分']||'',
@@ -628,11 +576,13 @@
                             price: Number(row['总价格'])||0, ply: row['支数']||'',
                             source: row['来源']||'', buyDate: row['购买时间']||'',
                             consumed: Number(row['已消耗(g)'])||0,
-                            image: '', isFavorite: false, createTime: Date.now()
+                            images: imgs, image: imgs[0] || '', // 兼容
+                            isFavorite: false, createTime: Date.now()
                         };
                         const existIdx = yarns.value.findIndex(y => y.id === id);
                         if(existIdx > -1) {
-                            yarns.value[existIdx] = { ...yarns.value[existIdx], ...item, image: yarns.value[existIdx].image, isFavorite: yarns.value[existIdx].isFavorite };
+                            // 保留原有收藏状态
+                            yarns.value[existIdx] = { ...item, isFavorite: yarns.value[existIdx].isFavorite };
                             updated++;
                         } else {
                             yarns.value.unshift(item);
@@ -649,7 +599,7 @@
                 currentPage, theme, yarns, filterType, sortBy, selectedYarn, formData, options,
                 showOptionModal, editingOptionTitle, editingOptionKey, newOptionInput,
                 themeMap, pageTitle, totalCost, totalWeight, totalConsumed, filteredYarns, computedUnitPrice, isEditing,
-                goBack, openAddForm, editYarn, saveYarn, handleImageUpload, appendMaterial,
+                goBack, openAddForm, editYarn, saveYarn, handleImageUpload, removeImage, appendMaterial,
                 viewDetail, toggleFavorite, confirmDelete, exportExcel, importExcel,
                 openOptionManager, addOption, removeOption
             };
