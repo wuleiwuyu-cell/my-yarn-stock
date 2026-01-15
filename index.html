@@ -16,7 +16,7 @@
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- LocalForage (关键更新：用于解决大文件存储卡顿问题) -->
+    <!-- LocalForage (高性能存储) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     
     <style>
@@ -64,7 +64,7 @@
             display: flex; align-items: center; justify-content: center;
         }
 
-        /* 底部抽屉样式 (iOS Style Sheet) */
+        /* 底部抽屉样式 */
         .bottom-sheet-mask {
             position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.4);
             display: flex; flex-direction: column; justify-content: flex-end;
@@ -87,6 +87,17 @@
         .spinner { border: 4px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top: 4px solid #ffffff; width: 40px; height: 40px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
+        /* 筛选按钮样式 */
+        .filter-btn {
+            flex-shrink: 0; px-3 py-1.5 rounded-full text-sm font-medium border transition-colors;
+        }
+        .filter-btn-active {
+            background-color: var(--primary); color: white; border-color: var(--primary); box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .filter-btn-inactive {
+            background-color: white; color: #4b5563; border-color: #e5e7eb;
+        }
+
         [v-cloak] { display: none; }
     </style>
 </head>
@@ -134,32 +145,78 @@
                         <div class="text-2xl font-bold text-gray-800">¥{{ totalCost }}</div>
                     </div>
                     <div class="col-span-2 border-t border-gray-100 pt-2 flex justify-between text-sm">
-                        <span class="text-gray-500">数量: <b>{{ yarns.length }}</b> 团</span>
+                        <span class="text-gray-500">显示: <b>{{ filteredYarns.length }}</b> 团</span>
                         <span class="text-gray-500">已用: <b>{{ (totalConsumed / 500).toFixed(1) }}</b> 斤</span>
                     </div>
                 </div>
 
-                <div class="flex items-center gap-3 overflow-x-auto pb-2 hide-scrollbar">
-                    <button @click="filterType = 'all'" :class="filterType === 'all' ? 'bg-theme text-white shadow-md' : 'bg-white text-gray-600 border'" class="flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium">全部</button>
-                    <button @click="filterType = 'fav'" :class="filterType === 'fav' ? 'bg-theme text-white shadow-md' : 'bg-white text-gray-600 border'" class="flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium">收藏 ❤️</button>
+                <!-- 升级版筛选工具栏 -->
+                <div class="flex items-center gap-2 overflow-x-auto pb-2 hide-scrollbar px-1">
+                    <button @click="setFilter('all')" 
+                        :class="activeFilter.type === 'all' ? 'filter-btn-active' : 'filter-btn-inactive'" 
+                        class="flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium border">
+                        全部
+                    </button>
+                    
+                    <button @click="setFilter('fav')" 
+                        :class="activeFilter.type === 'fav' ? 'filter-btn-active' : 'filter-btn-inactive'" 
+                        class="flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-medium border">
+                        收藏❤️
+                    </button>
+
+                    <!-- 分割线 -->
+                    <div class="w-px h-6 bg-gray-300 flex-shrink-0 mx-1"></div>
+
+                    <!-- 高级筛选按钮 -->
+                    <button @click="openFilterSheet('brands', 'brand', '按品牌筛选')" 
+                        :class="activeFilter.type === 'brand' ? 'filter-btn-active' : 'filter-btn-inactive'"
+                        class="flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-medium border flex items-center gap-1">
+                        {{ activeFilter.type === 'brand' ? activeFilter.value : '品牌' }} <i class="fas fa-caret-down text-xs opacity-50"></i>
+                    </button>
+
+                    <button @click="openFilterSheet('materials', 'composition', '按成分筛选')" 
+                        :class="activeFilter.type === 'composition' ? 'filter-btn-active' : 'filter-btn-inactive'"
+                        class="flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-medium border flex items-center gap-1">
+                        {{ activeFilter.type === 'composition' ? activeFilter.value : '成分' }} <i class="fas fa-caret-down text-xs opacity-50"></i>
+                    </button>
+
+                    <button @click="openFilterSheet('colors', 'color', '按颜色筛选')" 
+                        :class="activeFilter.type === 'color' ? 'filter-btn-active' : 'filter-btn-inactive'"
+                        class="flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-medium border flex items-center gap-1">
+                        {{ activeFilter.type === 'color' ? activeFilter.value : '颜色' }} <i class="fas fa-caret-down text-xs opacity-50"></i>
+                    </button>
+
+                    <button @click="openFilterSheet('sources', 'source', '按来源筛选')" 
+                        :class="activeFilter.type === 'source' ? 'filter-btn-active' : 'filter-btn-inactive'"
+                        class="flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-medium border flex items-center gap-1">
+                        {{ activeFilter.type === 'source' ? activeFilter.value : '来源' }} <i class="fas fa-caret-down text-xs opacity-50"></i>
+                    </button>
+
+                    <!-- 排序 -->
                     <div class="w-px h-6 bg-gray-300 flex-shrink-0 mx-1"></div>
                     <select v-model="sortBy" class="flex-shrink-0 px-3 py-1.5 rounded-full text-sm border border-gray-200 bg-white text-gray-600 outline-none">
-                        <option value="dateDesc">最新添加</option>
-                        <option value="priceDesc">单价(高到低)</option>
-                        <option value="weightDesc">余量(多到少)</option>
+                        <option value="dateDesc">最新</option>
+                        <option value="priceDesc">单价高</option>
+                        <option value="weightDesc">余量多</option>
                     </select>
                 </div>
+                
+                <!-- 当前筛选提示条 (仅在有复杂筛选时显示) -->
+                <div v-if="['brand','composition','color','source'].includes(activeFilter.type)" class="bg-gray-100 rounded-lg px-3 py-2 text-xs flex justify-between items-center text-gray-600">
+                    <span>当前筛选: <b>{{ translateType(activeFilter.type) }}</b> 为 "<b>{{ activeFilter.value }}</b>"</span>
+                    <button @click="setFilter('all')" class="text-theme font-bold">清除 <i class="fas fa-times"></i></button>
+                </div>
 
+                <!-- 列表展示 -->
                 <div class="space-y-3">
                     <div v-if="filteredYarns.length === 0" class="text-center py-20 opacity-50">
                         <i class="fas fa-box-open text-5xl mb-3 text-gray-300"></i>
-                        <p class="text-gray-500">暂无数据</p>
+                        <p class="text-gray-500">没有找到符合条件的毛线</p>
                     </div>
 
                     <div v-for="yarn in filteredYarns" :key="yarn.id" @click="viewDetail(yarn)" 
                         class="bg-white rounded-xl p-3 shadow-sm active:scale-[0.98] transition-transform duration-100 flex gap-3 border border-gray-100">
                         <div class="w-24 h-24 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden relative">
-                            <!-- 列表页性能优化：如果有图，显示第一张 -->
                             <img v-if="yarn.images && yarn.images.length > 0" :src="yarn.images[0]" loading="lazy" class="w-full h-full object-cover">
                             <div v-else class="w-full h-full flex items-center justify-center text-gray-300">
                                 <i class="fas fa-image text-xl"></i>
@@ -192,9 +249,8 @@
                 </div>
             </div>
 
-            <!-- 2. 编辑/添加表单 -->
+            <!-- 2. 编辑/添加表单 (保持不变，仅复用openSheet) -->
             <div v-if="currentPage === 'form'" class="space-y-5">
-                <!-- 图片区域 -->
                 <div class="bg-white p-4 rounded-xl shadow-sm">
                     <div class="flex justify-between items-center mb-2">
                         <span class="text-xs font-bold text-gray-500">照片 ({{formData.images.length}}张)</span>
@@ -213,7 +269,6 @@
                     <input type="file" ref="fileInput" accept="image/*" multiple class="hidden" @change="handleImageUpload">
                 </div>
 
-                <!-- 核心表单区域 -->
                 <div class="bg-white p-5 rounded-xl shadow-sm space-y-4">
                     <div>
                         <label class="text-xs font-bold text-gray-500">名称 <span class="text-red-500">*</span></label>
@@ -225,7 +280,7 @@
                             <label class="text-xs font-bold text-gray-500">品牌</label>
                             <div class="relative mt-1">
                                 <input v-model="formData.brand" type="text" class="w-full p-2 pr-8 bg-gray-50 rounded text-sm" placeholder="输入或选择">
-                                <button @click="openSheet('brands', 'brand', '选择品牌')" class="absolute right-0 top-0 h-full px-2 text-gray-400 active:text-theme flex items-center justify-center">
+                                <button @click="openInputSheet('brands', 'brand', '选择品牌')" class="absolute right-0 top-0 h-full px-2 text-gray-400 active:text-theme flex items-center justify-center">
                                     <i class="fas fa-chevron-down text-xs"></i>
                                 </button>
                             </div>
@@ -234,7 +289,7 @@
                             <label class="text-xs font-bold text-gray-500">颜色</label>
                             <div class="relative mt-1">
                                 <input v-model="formData.color" type="text" class="w-full p-2 pr-8 bg-gray-50 rounded text-sm" placeholder="输入或选择">
-                                <button @click="openSheet('colors', 'color', '选择颜色')" class="absolute right-0 top-0 h-full px-2 text-gray-400 active:text-theme flex items-center justify-center">
+                                <button @click="openInputSheet('colors', 'color', '选择颜色')" class="absolute right-0 top-0 h-full px-2 text-gray-400 active:text-theme flex items-center justify-center">
                                     <i class="fas fa-chevron-down text-xs"></i>
                                 </button>
                             </div>
@@ -244,7 +299,7 @@
                     <div>
                         <label class="text-xs font-bold text-gray-500">成分 <span class="text-red-500">*</span></label>
                         <div class="flex gap-2 mt-1">
-                            <button @click="openSheet('materials', 'composition_append', '添加成分')" class="whitespace-nowrap px-3 bg-gray-100 rounded text-sm text-gray-600 active:bg-gray-200 border border-gray-200">
+                            <button @click="openInputSheet('materials', 'composition_append', '添加成分')" class="whitespace-nowrap px-3 bg-gray-100 rounded text-sm text-gray-600 active:bg-gray-200 border border-gray-200">
                                 + 选成分
                             </button>
                             <input v-model="formData.composition" type="text" class="flex-1 p-2 bg-gray-50 rounded text-sm" placeholder="如: 80%羊毛 + 20%羊绒">
@@ -267,7 +322,7 @@
                             <label class="text-xs font-bold text-gray-500">支数</label>
                             <div class="relative mt-1">
                                 <input v-model="formData.ply" type="text" class="w-full p-2 pr-8 bg-gray-50 rounded text-sm" placeholder="如 2/26">
-                                <button @click="openSheet('plies', 'ply', '选择支数')" class="absolute right-0 top-0 h-full px-2 text-gray-400 active:text-theme flex items-center justify-center">
+                                <button @click="openInputSheet('plies', 'ply', '选择支数')" class="absolute right-0 top-0 h-full px-2 text-gray-400 active:text-theme flex items-center justify-center">
                                     <i class="fas fa-chevron-down text-xs"></i>
                                 </button>
                             </div>
@@ -276,7 +331,7 @@
                             <label class="text-xs font-bold text-gray-500">来源</label>
                             <div class="relative mt-1">
                                 <input v-model="formData.source" type="text" class="w-full p-2 pr-8 bg-gray-50 rounded text-sm" placeholder="如 某宝xx店">
-                                <button @click="openSheet('sources', 'source', '选择来源')" class="absolute right-0 top-0 h-full px-2 text-gray-400 active:text-theme flex items-center justify-center">
+                                <button @click="openInputSheet('sources', 'source', '选择来源')" class="absolute right-0 top-0 h-full px-2 text-gray-400 active:text-theme flex items-center justify-center">
                                     <i class="fas fa-chevron-down text-xs"></i>
                                 </button>
                             </div>
@@ -360,7 +415,7 @@
                     </div>
                 </div>
                 <div class="bg-white p-5 rounded-xl shadow-sm">
-                    <h3 class="font-bold text-gray-700 mb-4 flex items-center"><i class="fas fa-database mr-2 text-theme"></i> 数据备份 (JSON格式)</h3>
+                    <h3 class="font-bold text-gray-700 mb-4 flex items-center"><i class="fas fa-database mr-2 text-theme"></i> 数据备份</h3>
                     <div class="flex gap-3">
                         <button @click="exportData" class="flex-1 bg-green-500 text-white py-3 rounded-xl flex items-center justify-center gap-2 shadow-sm active:bg-green-600 transition-colors">
                             <i class="fas fa-file-export"></i> 导出备份
@@ -372,13 +427,8 @@
                              <input type="file" @change="importData" accept=".json" class="absolute top-0 left-0 w-full h-full opacity-0">
                         </div>
                     </div>
-                    <div class="bg-blue-50 text-blue-700 text-xs p-3 rounded-lg mt-3 leading-5 border border-blue-100">
-                        <p class="font-bold mb-1">💡 性能优化版</p>
-                        <p>已启用高性能存储引擎，支持存储数百张照片而不卡顿。</p>
-                        <p class="mt-1 text-gray-500">注意：更换手机或清理浏览器缓存时，请务必先“导出备份”。</p>
-                    </div>
                 </div>
-                <div class="text-center text-gray-400 text-xs pt-4">我的毛线仓库 v3.3 (高性能存储版)</div>
+                <div class="text-center text-gray-400 text-xs pt-4">我的毛线仓库 v3.4 (多维筛选增强版)</div>
             </div>
         </main>
 
@@ -399,7 +449,7 @@
             </div>
         </nav>
 
-        <!-- 设置页面用的旧版管理弹窗 -->
+        <!-- 管理弹窗 -->
         <div v-if="showOptionModal" class="modal-mask" @click.self="showOptionModal = false">
             <div class="bg-white w-4/5 max-w-sm rounded-xl p-5 shadow-2xl">
                 <div class="flex justify-between items-center mb-4 border-b pb-2"><h3 class="font-bold text-gray-800">管理：{{ editingOptionTitle }}</h3><button @click="showOptionModal = false" class="text-gray-400"><i class="fas fa-times"></i></button></div>
@@ -408,7 +458,7 @@
             </div>
         </div>
 
-        <!-- iOS风格底部选择抽屉 -->
+        <!-- 底部通用抽屉 (用于输入和筛选) -->
         <div v-if="sheet.show" class="bottom-sheet-mask" @click.self="sheet.show = false">
             <div class="bottom-sheet-content">
                 <div class="flex justify-between items-center p-4 border-b border-gray-100">
@@ -416,7 +466,6 @@
                     <button @click="sheet.show = false" class="text-gray-400 w-8 h-8 bg-gray-100 rounded-full"><i class="fas fa-times"></i></button>
                 </div>
                 <div class="overflow-y-auto p-4 space-y-2" style="max-height: 50vh;">
-                    <!-- 显示现有选项 -->
                     <div class="flex flex-wrap gap-2">
                         <button v-for="item in options[sheet.listKey]" :key="item" 
                             @click="selectFromSheet(item)"
@@ -425,7 +474,7 @@
                         </button>
                     </div>
                     <div v-if="options[sheet.listKey].length === 0" class="text-center text-gray-400 py-4 text-sm">
-                        暂无选项，请直接在输入框输入，保存后会自动记录。
+                        暂无选项
                     </div>
                 </div>
             </div>
@@ -439,18 +488,11 @@
 
     createApp({
         setup() {
-            const isLoading = ref(true); // 默认加载中，直到从 IndexedDB 读取完毕
+            const isLoading = ref(true);
             const loadingText = ref('加载仓库数据...');
 
-            // 初始化 LocalForage
-            localforage.config({
-                driver: localforage.INDEXEDDB, // 强制使用 IndexedDB
-                name: 'YarnStockApp',
-                version: 1.0,
-                storeName: 'yarn_data'
-            });
+            localforage.config({ driver: localforage.INDEXEDDB, name: 'YarnStockApp', version: 1.0, storeName: 'yarn_data' });
 
-            // --- 核心状态 ---
             const theme = ref(localStorage.getItem('coil_theme') || 'pink');
             const themeMap = {
                 pink: { primary: '#fb7185', bgLight: '#fff1f2', text: '#881337' },
@@ -463,7 +505,6 @@
             const currentPage = ref('home');
             const yarns = ref([]);
             
-            // 选项数据
             const defaultOptions = {
                 materials: ['羊毛', '羊绒', '貉绒', '马海', '化纤', '真丝', '苎麻', '棉', '混纺'],
                 brands: ['蝴蝶', '凌厉', '康赛妮', '中鼎', '新奥', '欧美斯', '南韩'],
@@ -473,11 +514,13 @@
             };
             const options = reactive(JSON.parse(localStorage.getItem('coil_options')) || defaultOptions);
             
-            // 底部抽屉状态
-            const sheet = reactive({ show: false, listKey: '', targetField: '', title: '' });
+            // 抽屉状态，新增 mode 区分是输入还是筛选
+            const sheet = reactive({ show: false, listKey: '', targetField: '', title: '', mode: 'input' });
 
-            const filterType = ref('all');
+            // 筛选状态
+            const activeFilter = reactive({ type: 'all', value: '' });
             const sortBy = ref('dateDesc');
+            
             const selectedYarn = ref(null);
             const isEditing = ref(false);
 
@@ -487,13 +530,11 @@
                 isFavorite: false, createTime: 0
             });
 
-            // 旧版弹窗状态
             const showOptionModal = ref(false);
             const editingOptionKey = ref('');
             const editingOptionTitle = ref('');
             const newOptionInput = ref('');
 
-            // --- 监听与初始化 ---
             watch(theme, (newVal) => {
                 const t = themeMap[newVal] || themeMap['pink'];
                 document.documentElement.style.setProperty('--primary', t.primary);
@@ -502,65 +543,53 @@
                 localStorage.setItem('coil_theme', newVal);
             }, { immediate: true });
 
-            // 关键修改：初始化时尝试从 LocalStorage 迁移数据，然后读取 IndexedDB
             onMounted(async () => {
                 try {
-                    // 1. 尝试读取 IndexedDB 数据
                     const dbYarns = await localforage.getItem('coil_yarns');
-                    
                     if (dbYarns) {
                         yarns.value = dbYarns;
                     } else {
-                        // 2. 如果 IndexedDB 为空，检查是否有旧的 LocalStorage 数据（迁移逻辑）
                         const oldYarns = localStorage.getItem('coil_yarns');
                         if (oldYarns) {
-                            console.log('正在从旧版 LocalStorage 迁移数据...');
                             let parsed = JSON.parse(oldYarns);
                             parsed.forEach(y => { if (!y.images) y.images = y.image ? [y.image] : []; });
                             yarns.value = parsed;
-                            // 存入 IndexedDB
                             await localforage.setItem('coil_yarns', parsed);
-                            // 清除旧数据释放空间 (可选，为了安全暂保留)
-                            // localStorage.removeItem('coil_yarns'); 
                         }
                     }
-                    
-                    // 选项数据量小，保留在 LocalStorage 即可
                     for(let key in defaultOptions) if(!options[key]) options[key] = defaultOptions[key];
-                } catch (err) {
-                    console.error("加载数据失败:", err);
-                    alert("数据加载出现问题，请刷新重试");
-                } finally {
-                    isLoading.value = false;
-                }
+                } catch (err) { console.error(err); } finally { isLoading.value = false; }
             });
 
-            // 关键修改：移除对 yarns 的自动 watch，避免频繁写入硬盘导致卡顿
-            // watch(yarns, ...) 已删除。
-            
             watch(options, () => localStorage.setItem('coil_options', JSON.stringify(options)), { deep: true });
 
-            // 封装保存函数
             const persistData = async () => {
-                try {
-                    // 深拷贝以去除 Proxy
-                    const dataToSave = JSON.parse(JSON.stringify(yarns.value));
-                    await localforage.setItem('coil_yarns', dataToSave);
-                } catch (err) {
-                    console.error("保存失败:", err);
-                    alert("保存失败，存储空间可能不足");
-                }
+                try { await localforage.setItem('coil_yarns', JSON.parse(JSON.stringify(yarns.value))); } catch (err) { alert("保存失败"); }
             };
 
-            // --- 计算属性 ---
             const pageTitle = computed(() => ({ home: '我的毛线仓库', settings: '设置', form: isEditing.value ? '编辑记录' : '入库登记', detail: '详情' }[currentPage.value]));
             const totalCost = computed(() => yarns.value.reduce((sum, y) => sum + (y.price || 0), 0));
             const totalWeight = computed(() => yarns.value.reduce((sum, y) => sum + (y.weight || 0), 0));
             const totalConsumed = computed(() => yarns.value.reduce((sum, y) => sum + (y.consumed || 0), 0));
             
+            // --- 核心筛选逻辑升级 ---
             const filteredYarns = computed(() => {
                 let list = [...yarns.value];
-                if (filterType.value === 'fav') list = list.filter(y => y.isFavorite);
+                
+                // 根据筛选类型过滤
+                if (activeFilter.type === 'fav') {
+                    list = list.filter(y => y.isFavorite);
+                } else if (activeFilter.type === 'brand') {
+                    list = list.filter(y => y.brand === activeFilter.value);
+                } else if (activeFilter.type === 'color') {
+                    list = list.filter(y => y.color === activeFilter.value);
+                } else if (activeFilter.type === 'source') {
+                    list = list.filter(y => y.source === activeFilter.value);
+                } else if (activeFilter.type === 'composition') {
+                    // 成分支持模糊匹配，例如选择“羊毛”，则“80%羊毛”也会显示
+                    list = list.filter(y => (y.composition || '').indexOf(activeFilter.value) !== -1);
+                }
+
                 list.sort((a, b) => {
                     if (sortBy.value === 'dateDesc') return b.createTime - a.createTime;
                     if (sortBy.value === 'priceDesc') return (b.price/b.weight) - (a.price/a.weight);
@@ -570,32 +599,58 @@
                 return list;
             });
 
-            // --- 方法 ---
+            const translateType = (type) => {
+                const map = { brand: '品牌', composition: '成分', color: '颜色', source: '来源' };
+                return map[type] || type;
+            };
+
             const goBack = () => currentPage.value = 'home';
             
-            // 底部抽屉逻辑
-            const openSheet = (listKey, targetField, title) => {
+            // --- 抽屉操作逻辑升级 ---
+            
+            // 打开输入用的抽屉
+            const openInputSheet = (listKey, targetField, title) => {
                 sheet.listKey = listKey;
                 sheet.targetField = targetField;
                 sheet.title = title;
+                sheet.mode = 'input'; // 设置为输入模式
+                sheet.show = true;
+            };
+
+            // 打开筛选用的抽屉
+            const openFilterSheet = (listKey, filterType, title) => {
+                sheet.listKey = listKey;
+                sheet.targetField = filterType; // 这里借用 targetField 存 filterType
+                sheet.title = title;
+                sheet.mode = 'filter'; // 设置为筛选模式
                 sheet.show = true;
             };
 
             const selectFromSheet = (value) => {
-                if (sheet.targetField === 'composition_append') {
-                    formData.composition = formData.composition ? `${formData.composition} + ${value}` : value;
-                } else {
-                    formData[sheet.targetField] = value;
+                if (sheet.mode === 'input') {
+                    // 原有的表单输入逻辑
+                    if (sheet.targetField === 'composition_append') {
+                        formData.composition = formData.composition ? `${formData.composition} + ${value}` : value;
+                    } else {
+                        formData[sheet.targetField] = value;
+                    }
+                } else if (sheet.mode === 'filter') {
+                    // 新的筛选逻辑
+                    activeFilter.type = sheet.targetField; // 这里的 targetField 存的是 brand/color 等
+                    activeFilter.value = value;
                 }
                 sheet.show = false;
             };
 
-            // 设置页的管理逻辑
+            const setFilter = (type) => {
+                activeFilter.type = type;
+                activeFilter.value = '';
+            };
+
             const openOptionManager = (k, t) => { editingOptionKey.value = k; editingOptionTitle.value = t; newOptionInput.value = ''; showOptionModal.value = true; };
             const addOption = () => { if(newOptionInput.value.trim()){ options[editingOptionKey.value].push(newOptionInput.value.trim()); newOptionInput.value = ''; }};
             const removeOption = (i) => options[editingOptionKey.value].splice(i, 1);
 
-            // 图片处理 - 保持压缩
             const handleImageUpload = (e) => {
                 const files = e.target.files;
                 if (!files.length) return;
@@ -612,12 +667,11 @@
                             img.onload = () => {
                                 const canvas = document.createElement('canvas');
                                 const ctx = canvas.getContext('2d');
-                                const maxWidth = 500; // 保持 500px 以控制大小
+                                const maxWidth = 500;
                                 const scale = maxWidth / img.width;
                                 canvas.width = maxWidth;
                                 canvas.height = img.height * scale;
                                 ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                                // 0.6 质量压缩
                                 formData.images.push(canvas.toDataURL('image/jpeg', 0.6));
                                 processed++;
                                 if(processed === count) isLoading.value = false;
@@ -630,7 +684,6 @@
             };
             const removeImage = (index) => { formData.images.splice(index, 1); };
 
-            // 表单操作
             const openAddForm = () => {
                 isEditing.value = false;
                 Object.keys(formData).forEach(k => formData[k] = (k==='weight'?500:k==='price'?0:k==='consumed'?0:k==='isFavorite'?false:k==='images'?[]:''));
@@ -646,20 +699,14 @@
                 currentPage.value = 'form';
             };
 
-            // 保存逻辑优化
             const saveYarn = async () => {
                 if (!formData.name || !formData.weight) return alert('请填写名称和重量');
-                
                 isLoading.value = true;
-                loadingText.value = '正在保存...';
-
-                // 自动保存新选项逻辑
+                
                 const checkAndSave = (fieldValue, listKey) => {
                     if (fieldValue && fieldValue.trim()) {
                         const val = fieldValue.trim();
-                        if (!options[listKey].includes(val)) {
-                            options[listKey].push(val);
-                        }
+                        if (!options[listKey].includes(val)) options[listKey].push(val);
                     }
                 };
                 checkAndSave(formData.brand, 'brands');
@@ -672,45 +719,25 @@
                 
                 if (isEditing.value) {
                     const idx = yarns.value.findIndex(y => y.id === formData.id);
-                    if (idx !== -1) {
-                        yarns.value[idx] = data;
-                        selectedYarn.value = data;
-                        currentPage.value = 'detail';
-                    }
+                    if (idx !== -1) { yarns.value[idx] = data; selectedYarn.value = data; currentPage.value = 'detail'; }
                 } else {
                     data.id = Date.now().toString(36) + Math.random().toString(36).substr(2);
                     data.createTime = Date.now();
                     yarns.value.unshift(data);
                     currentPage.value = 'home';
                 }
-
-                // 显式异步保存
                 await persistData();
                 isLoading.value = false;
             };
 
             const viewDetail = (y) => { selectedYarn.value = y; currentPage.value = 'detail'; };
-            
-            const toggleFavorite = async (y) => { 
-                y.isFavorite = !y.isFavorite;
-                await persistData(); // 点击收藏后手动保存
-            };
-            
-            const confirmDelete = async (y) => { 
-                if (confirm('确定删除吗？')) { 
-                    yarns.value = yarns.value.filter(item => item.id !== y.id); 
-                    currentPage.value = 'home'; 
-                    await persistData(); // 删除后手动保存
-                }
-            };
+            const toggleFavorite = async (y) => { y.isFavorite = !y.isFavorite; await persistData(); };
+            const confirmDelete = async (y) => { if (confirm('确定删除吗？')) { yarns.value = yarns.value.filter(item => item.id !== y.id); currentPage.value = 'home'; await persistData(); }};
 
-            // 数据备份
             const exportData = () => {
                 const nameInput = prompt("请输入备份文件名:", "毛线库存备份_" + new Date().toISOString().split('T')[0]);
                 if (!nameInput) return;
                 isLoading.value = true;
-                loadingText.value = '正在生成备份文件...';
-                
                 setTimeout(() => {
                     try {
                         const jsonStr = JSON.stringify(yarns.value);
@@ -723,8 +750,7 @@
                         a.click();
                         document.body.removeChild(a);
                         window.URL.revokeObjectURL(url);
-                        setTimeout(() => { alert("备份已生成！\n请保存好该 JSON 文件。"); }, 500);
-                    } catch (e) { alert("备份失败：" + e.message); } finally { isLoading.value = false; }
+                    } catch (e) { alert("备份失败"); } finally { isLoading.value = false; }
                 }, 100);
             };
 
@@ -732,13 +758,12 @@
                 const file = e.target.files[0];
                 if(!file) return;
                 isLoading.value = true;
-                loadingText.value = '正在恢复数据...';
                 setTimeout(() => {
                     const reader = new FileReader();
                     reader.onload = async (evt) => {
                         try {
                             const importedYarns = JSON.parse(evt.target.result);
-                            if (!Array.isArray(importedYarns)) throw new Error("格式错误");
+                            if (!Array.isArray(importedYarns)) throw new Error;
                             let added = 0, updated = 0;
                             importedYarns.forEach(item => {
                                 if (!item.id || !item.name) return;
@@ -746,9 +771,9 @@
                                 if(existIdx > -1) { yarns.value[existIdx] = { ...item, isFavorite: yarns.value[existIdx].isFavorite }; updated++; } 
                                 else { yarns.value.unshift(item); added++; }
                             });
-                            await persistData(); // 导入后保存
-                            alert(`恢复成功：新增 ${added} 条, 更新 ${updated} 条`);
-                        } catch (err) { alert("恢复失败：文件格式不正确或已损坏"); } finally { isLoading.value = false; e.target.value = ''; }
+                            await persistData();
+                            alert(`恢复成功：新增 ${added}, 更新 ${updated}`);
+                        } catch (err) { alert("文件错误"); } finally { isLoading.value = false; e.target.value = ''; }
                     };
                     reader.readAsText(file);
                 }, 100);
@@ -756,8 +781,8 @@
 
             return {
                 isLoading, loadingText,
-                currentPage, theme, yarns, filterType, sortBy, selectedYarn, formData, options,
-                sheet, openSheet, selectFromSheet, 
+                currentPage, theme, yarns, activeFilter, sortBy, selectedYarn, formData, options,
+                sheet, openInputSheet, openFilterSheet, selectFromSheet, setFilter, translateType,
                 showOptionModal, editingOptionTitle, editingOptionKey, newOptionInput,
                 themeMap, pageTitle, totalCost, totalWeight, totalConsumed, filteredYarns, isEditing,
                 goBack, openAddForm, editYarn, saveYarn, handleImageUpload, removeImage,
