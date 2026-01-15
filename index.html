@@ -16,6 +16,8 @@
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- LocalForage (关键更新：用于解决大文件存储卡顿问题) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     
     <style>
         /* --- 核心变量 --- */
@@ -157,7 +159,8 @@
                     <div v-for="yarn in filteredYarns" :key="yarn.id" @click="viewDetail(yarn)" 
                         class="bg-white rounded-xl p-3 shadow-sm active:scale-[0.98] transition-transform duration-100 flex gap-3 border border-gray-100">
                         <div class="w-24 h-24 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden relative">
-                            <img v-if="yarn.images && yarn.images.length > 0" :src="yarn.images[0]" class="w-full h-full object-cover">
+                            <!-- 列表页性能优化：如果有图，显示第一张 -->
+                            <img v-if="yarn.images && yarn.images.length > 0" :src="yarn.images[0]" loading="lazy" class="w-full h-full object-cover">
                             <div v-else class="w-full h-full flex items-center justify-center text-gray-300">
                                 <i class="fas fa-image text-xl"></i>
                             </div>
@@ -217,7 +220,6 @@
                         <input v-model="formData.name" type="text" class="w-full mt-1 p-2 bg-gray-50 border-b-2 border-transparent focus:border-theme outline-none" placeholder="输入名称">
                     </div>
                     
-                    <!-- 优化后的品牌与颜色选择 -->
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="text-xs font-bold text-gray-500">品牌</label>
@@ -239,7 +241,6 @@
                         </div>
                     </div>
 
-                    <!-- 优化后的成分 -->
                     <div>
                         <label class="text-xs font-bold text-gray-500">成分 <span class="text-red-500">*</span></label>
                         <div class="flex gap-2 mt-1">
@@ -261,7 +262,6 @@
                         </div>
                     </div>
 
-                    <!-- 优化后的支数与来源 -->
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="text-xs font-bold text-gray-500">支数</label>
@@ -292,10 +292,6 @@
                             <label class="text-xs font-bold text-gray-500">已消耗(g)</label>
                             <input v-model.number="formData.consumed" type="number" class="w-full mt-1 p-2 bg-gray-50 rounded font-mono">
                         </div>
-                    </div>
-                    
-                    <div class="text-xs text-center text-gray-400 bg-gray-50 p-2 rounded mt-2">
-                        💡 提示：手动输入的新品牌/颜色/成分/来源，保存后会自动加入选项列表，方便下次选择。
                     </div>
                 </div>
             </div>
@@ -377,12 +373,12 @@
                         </div>
                     </div>
                     <div class="bg-blue-50 text-blue-700 text-xs p-3 rounded-lg mt-3 leading-5 border border-blue-100">
-                        <p class="font-bold mb-1">💡 强烈推荐使用此功能</p>
-                        <p>JSON格式是数据的完美克隆，没有Excel的字符限制，能100%还原您的所有照片和记录，且速度极快。</p>
-                        <p class="mt-1 text-gray-500">操作指南：导出后请点击 Safari 下载栏，将文件存储到【文件】APP。</p>
+                        <p class="font-bold mb-1">💡 性能优化版</p>
+                        <p>已启用高性能存储引擎，支持存储数百张照片而不卡顿。</p>
+                        <p class="mt-1 text-gray-500">注意：更换手机或清理浏览器缓存时，请务必先“导出备份”。</p>
                     </div>
                 </div>
-                <div class="text-center text-gray-400 text-xs pt-4">我的毛线仓库 v3.2 (智能选项+体验优化)</div>
+                <div class="text-center text-gray-400 text-xs pt-4">我的毛线仓库 v3.3 (高性能存储版)</div>
             </div>
         </main>
 
@@ -412,7 +408,7 @@
             </div>
         </div>
 
-        <!-- 新增：iOS风格底部选择抽屉 -->
+        <!-- iOS风格底部选择抽屉 -->
         <div v-if="sheet.show" class="bottom-sheet-mask" @click.self="sheet.show = false">
             <div class="bottom-sheet-content">
                 <div class="flex justify-between items-center p-4 border-b border-gray-100">
@@ -443,8 +439,16 @@
 
     createApp({
         setup() {
-            const isLoading = ref(false);
-            const loadingText = ref('处理中...');
+            const isLoading = ref(true); // 默认加载中，直到从 IndexedDB 读取完毕
+            const loadingText = ref('加载仓库数据...');
+
+            // 初始化 LocalForage
+            localforage.config({
+                driver: localforage.INDEXEDDB, // 强制使用 IndexedDB
+                name: 'YarnStockApp',
+                version: 1.0,
+                storeName: 'yarn_data'
+            });
 
             // --- 核心状态 ---
             const theme = ref(localStorage.getItem('coil_theme') || 'pink');
@@ -498,20 +502,55 @@
                 localStorage.setItem('coil_theme', newVal);
             }, { immediate: true });
 
-            onMounted(() => {
-                const savedYarns = localStorage.getItem('coil_yarns');
-                if (savedYarns) {
-                    let parsed = JSON.parse(savedYarns);
-                    parsed.forEach(y => {
-                        if (!y.images) { y.images = y.image ? [y.image] : []; }
-                    });
-                    yarns.value = parsed;
+            // 关键修改：初始化时尝试从 LocalStorage 迁移数据，然后读取 IndexedDB
+            onMounted(async () => {
+                try {
+                    // 1. 尝试读取 IndexedDB 数据
+                    const dbYarns = await localforage.getItem('coil_yarns');
+                    
+                    if (dbYarns) {
+                        yarns.value = dbYarns;
+                    } else {
+                        // 2. 如果 IndexedDB 为空，检查是否有旧的 LocalStorage 数据（迁移逻辑）
+                        const oldYarns = localStorage.getItem('coil_yarns');
+                        if (oldYarns) {
+                            console.log('正在从旧版 LocalStorage 迁移数据...');
+                            let parsed = JSON.parse(oldYarns);
+                            parsed.forEach(y => { if (!y.images) y.images = y.image ? [y.image] : []; });
+                            yarns.value = parsed;
+                            // 存入 IndexedDB
+                            await localforage.setItem('coil_yarns', parsed);
+                            // 清除旧数据释放空间 (可选，为了安全暂保留)
+                            // localStorage.removeItem('coil_yarns'); 
+                        }
+                    }
+                    
+                    // 选项数据量小，保留在 LocalStorage 即可
+                    for(let key in defaultOptions) if(!options[key]) options[key] = defaultOptions[key];
+                } catch (err) {
+                    console.error("加载数据失败:", err);
+                    alert("数据加载出现问题，请刷新重试");
+                } finally {
+                    isLoading.value = false;
                 }
-                for(let key in defaultOptions) if(!options[key]) options[key] = defaultOptions[key];
             });
 
-            watch(yarns, () => localStorage.setItem('coil_yarns', JSON.stringify(yarns.value)), { deep: true });
+            // 关键修改：移除对 yarns 的自动 watch，避免频繁写入硬盘导致卡顿
+            // watch(yarns, ...) 已删除。
+            
             watch(options, () => localStorage.setItem('coil_options', JSON.stringify(options)), { deep: true });
+
+            // 封装保存函数
+            const persistData = async () => {
+                try {
+                    // 深拷贝以去除 Proxy
+                    const dataToSave = JSON.parse(JSON.stringify(yarns.value));
+                    await localforage.setItem('coil_yarns', dataToSave);
+                } catch (err) {
+                    console.error("保存失败:", err);
+                    alert("保存失败，存储空间可能不足");
+                }
+            };
 
             // --- 计算属性 ---
             const pageTitle = computed(() => ({ home: '我的毛线仓库', settings: '设置', form: isEditing.value ? '编辑记录' : '入库登记', detail: '详情' }[currentPage.value]));
@@ -544,10 +583,8 @@
 
             const selectFromSheet = (value) => {
                 if (sheet.targetField === 'composition_append') {
-                    // 特殊处理成分：追加模式
                     formData.composition = formData.composition ? `${formData.composition} + ${value}` : value;
                 } else {
-                    // 普通模式：直接赋值
                     formData[sheet.targetField] = value;
                 }
                 sheet.show = false;
@@ -558,7 +595,7 @@
             const addOption = () => { if(newOptionInput.value.trim()){ options[editingOptionKey.value].push(newOptionInput.value.trim()); newOptionInput.value = ''; }};
             const removeOption = (i) => options[editingOptionKey.value].splice(i, 1);
 
-            // 图片处理
+            // 图片处理 - 保持压缩
             const handleImageUpload = (e) => {
                 const files = e.target.files;
                 if (!files.length) return;
@@ -575,11 +612,12 @@
                             img.onload = () => {
                                 const canvas = document.createElement('canvas');
                                 const ctx = canvas.getContext('2d');
-                                const maxWidth = 500; 
+                                const maxWidth = 500; // 保持 500px 以控制大小
                                 const scale = maxWidth / img.width;
                                 canvas.width = maxWidth;
                                 canvas.height = img.height * scale;
                                 ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                                // 0.6 质量压缩
                                 formData.images.push(canvas.toDataURL('image/jpeg', 0.6));
                                 processed++;
                                 if(processed === count) isLoading.value = false;
@@ -608,26 +646,26 @@
                 currentPage.value = 'form';
             };
 
-            // 核心：保存并自动记录新选项
-            const saveYarn = () => {
+            // 保存逻辑优化
+            const saveYarn = async () => {
                 if (!formData.name || !formData.weight) return alert('请填写名称和重量');
                 
-                // 自动保存新选项逻辑 (智能记忆)
+                isLoading.value = true;
+                loadingText.value = '正在保存...';
+
+                // 自动保存新选项逻辑
                 const checkAndSave = (fieldValue, listKey) => {
                     if (fieldValue && fieldValue.trim()) {
                         const val = fieldValue.trim();
-                        // 如果列表中不存在这个值，则加入
                         if (!options[listKey].includes(val)) {
                             options[listKey].push(val);
                         }
                     }
                 };
-                
                 checkAndSave(formData.brand, 'brands');
                 checkAndSave(formData.color, 'colors');
                 checkAndSave(formData.ply, 'plies');
                 checkAndSave(formData.source, 'sources');
-                // 成分比较复杂，通常是组合词，暂时不自动保存整句，保持用户手动管理或仅通过追加按钮操作
 
                 const data = { ...formData };
                 data.image = data.images.length > 0 ? data.images[0] : '';
@@ -645,11 +683,26 @@
                     yarns.value.unshift(data);
                     currentPage.value = 'home';
                 }
+
+                // 显式异步保存
+                await persistData();
+                isLoading.value = false;
             };
 
             const viewDetail = (y) => { selectedYarn.value = y; currentPage.value = 'detail'; };
-            const toggleFavorite = (y) => y.isFavorite = !y.isFavorite;
-            const confirmDelete = (y) => { if (confirm('确定删除吗？')) { yarns.value = yarns.value.filter(item => item.id !== y.id); currentPage.value = 'home'; }};
+            
+            const toggleFavorite = async (y) => { 
+                y.isFavorite = !y.isFavorite;
+                await persistData(); // 点击收藏后手动保存
+            };
+            
+            const confirmDelete = async (y) => { 
+                if (confirm('确定删除吗？')) { 
+                    yarns.value = yarns.value.filter(item => item.id !== y.id); 
+                    currentPage.value = 'home'; 
+                    await persistData(); // 删除后手动保存
+                }
+            };
 
             // 数据备份
             const exportData = () => {
@@ -670,7 +723,7 @@
                         a.click();
                         document.body.removeChild(a);
                         window.URL.revokeObjectURL(url);
-                        setTimeout(() => { alert("备份已生成！\n请点击 Safari 地址栏的下载图标，将 .json 文件存储到【文件】App中妥善保存。"); }, 500);
+                        setTimeout(() => { alert("备份已生成！\n请保存好该 JSON 文件。"); }, 500);
                     } catch (e) { alert("备份失败：" + e.message); } finally { isLoading.value = false; }
                 }, 100);
             };
@@ -682,7 +735,7 @@
                 loadingText.value = '正在恢复数据...';
                 setTimeout(() => {
                     const reader = new FileReader();
-                    reader.onload = (evt) => {
+                    reader.onload = async (evt) => {
                         try {
                             const importedYarns = JSON.parse(evt.target.result);
                             if (!Array.isArray(importedYarns)) throw new Error("格式错误");
@@ -693,6 +746,7 @@
                                 if(existIdx > -1) { yarns.value[existIdx] = { ...item, isFavorite: yarns.value[existIdx].isFavorite }; updated++; } 
                                 else { yarns.value.unshift(item); added++; }
                             });
+                            await persistData(); // 导入后保存
                             alert(`恢复成功：新增 ${added} 条, 更新 ${updated} 条`);
                         } catch (err) { alert("恢复失败：文件格式不正确或已损坏"); } finally { isLoading.value = false; e.target.value = ''; }
                     };
@@ -703,7 +757,7 @@
             return {
                 isLoading, loadingText,
                 currentPage, theme, yarns, filterType, sortBy, selectedYarn, formData, options,
-                sheet, openSheet, selectFromSheet, // 新增的抽屉逻辑
+                sheet, openSheet, selectFromSheet, 
                 showOptionModal, editingOptionTitle, editingOptionKey, newOptionInput,
                 themeMap, pageTitle, totalCost, totalWeight, totalConsumed, filteredYarns, isEditing,
                 goBack, openAddForm, editYarn, saveYarn, handleImageUpload, removeImage,
